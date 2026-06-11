@@ -25,7 +25,12 @@ async function mcpSession(): Promise<string> {
   return sid
 }
 
-/** Call an MCP tool and return its text content items (SSE or plain JSON body). */
+/**
+ * Call an MCP tool and return its text content items (SSE or plain JSON body).
+ * Throws on a JSON-RPC error OR a tool-level error (`result.isError`) — the
+ * mongodb-mcp-server reports "not connected" / write failures via isError, and
+ * silently swallowing those is what makes a failed sign-in look successful.
+ */
 async function mcpCall(sid: string, name: string, args: Record<string, unknown>): Promise<string[]> {
   const res = await fetch(MCP_URL, {
     method: 'POST',
@@ -46,20 +51,35 @@ async function mcpCall(sid: string, name: string, args: Record<string, unknown>)
     ? body.split('\n').filter((l) => l.startsWith('data:')).map((l) => l.slice(5).trim())
     : [body]
   for (const payload of payloads) {
+    let msg: { result?: { content?: Array<{ type: string; text?: string }>; isError?: boolean }; error?: { message?: string } }
     try {
-      const msg = JSON.parse(payload)
-      if (msg.result?.content) {
-        return (msg.result.content as Array<{ type: string; text?: string }>)
-          .filter((c) => c.type === 'text' && c.text)
-          .map((c) => c.text as string)
-      }
-      if (msg.error) throw new Error(msg.error.message ?? 'MCP tool error')
-    } catch (err) {
-      if (err instanceof SyntaxError) continue
-      throw err
+      msg = JSON.parse(payload)
+    } catch {
+      continue
+    }
+    if (msg.error) throw new Error(msg.error.message ?? 'MCP tool error')
+    if (msg.result?.content) {
+      const texts = msg.result.content.filter((c) => c.type === 'text' && c.text).map((c) => c.text as string)
+      if (msg.result.isError) throw new Error(texts.join(' ') || 'MongoDB MCP returned an error')
+      return texts
     }
   }
   return []
+}
+
+/**
+ * If the server was started without a connection string, try to connect it with
+ * MONGODB_URI when that is available to the Next process. A no-op otherwise; the
+ * next call then surfaces a clear "not connected" error.
+ */
+async function ensureConnected(sid: string): Promise<void> {
+  const uri = process.env.MONGODB_URI
+  if (!uri) return
+  try {
+    await mcpCall(sid, 'connect', { connectionString: uri })
+  } catch {
+    /* already connected, or connect unsupported — ignore and let real calls report */
+  }
 }
 
 /** The mongodb-mcp-server returns docs as a JSON array inside one text item. */
@@ -76,6 +96,7 @@ function extractDocs(texts: string[]): Array<Record<string, unknown>> {
 function publicUser(doc: Record<string, unknown>) {
   return {
     user_id: doc.user_id,
+    name: doc.name ?? null,
     email: doc.email,
     home_country: doc.home_country ?? null,
     languages: doc.languages ?? ['en'],
@@ -83,13 +104,28 @@ function publicUser(doc: Record<string, unknown>) {
   }
 }
 
+/** Turn a chosen name/handle into a stable, URL-safe user_id. */
+function slugifyId(name: string, email: string): string {
+  const base = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  return base || email.split('@')[0].replace(/[^a-z0-9_]/g, '') || 'fan'
+}
+
 export async function POST(req: NextRequest) {
   let email: string
+  let name: string
   try {
     const body = await req.json()
     email = String(body.email ?? '').trim().toLowerCase()
+    name = String(body.name ?? '').trim()
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
+  if (!name || name.length < 2) {
+    return NextResponse.json({ error: 'Enter your name or a username (at least 2 characters).' }, { status: 400 })
   }
   if (!EMAIL_RE.test(email)) {
     return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 })
@@ -97,16 +133,28 @@ export async function POST(req: NextRequest) {
 
   try {
     const sid = await mcpSession()
+    await ensureConnected(sid)
 
+    // Returning user: match on email, keep their stable user_id, refresh the name.
     const existing = extractDocs(
       await mcpCall(sid, 'find', { database: DB, collection: 'users', filter: { email }, limit: 1 }),
     )
     if (existing.length > 0) {
-      return NextResponse.json({ user: publicUser(existing[0]), isNew: false })
+      const doc = existing[0]
+      if (doc.name !== name) {
+        await mcpCall(sid, 'update-many', {
+          database: DB,
+          collection: 'users',
+          filter: { email },
+          update: { $set: { name } },
+        })
+        doc.name = name
+      }
+      return NextResponse.json({ user: publicUser(doc), isNew: false })
     }
 
     // First sign-in: create a profile matching the existing users schema.
-    let userId = email.split('@')[0].replace(/[^a-z0-9_]/g, '') || 'fan'
+    let userId = slugifyId(name, email)
     const clash = extractDocs(
       await mcpCall(sid, 'find', { database: DB, collection: 'users', filter: { user_id: userId }, limit: 1 }),
     )
@@ -116,6 +164,7 @@ export async function POST(req: NextRequest) {
 
     const doc = {
       user_id: userId,
+      name,
       email,
       home_country: null,
       languages: ['en'],
@@ -129,9 +178,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ user: publicUser(doc), isNew: true })
   } catch (err) {
     console.error('[auth/login]', err)
-    return NextResponse.json(
-      { error: 'Could not reach the profile database. Is the MongoDB MCP server running on port 3100?' },
-      { status: 502 },
-    )
+    const detail = err instanceof Error && /connect to a MongoDB/i.test(err.message)
+      ? 'The profile database is not connected. Start the MongoDB MCP server on port 3100 with your connection string (MDB_MCP_CONNECTION_STRING).'
+      : 'Could not reach the profile database. Is the MongoDB MCP server running on port 3100?'
+    return NextResponse.json({ error: detail }, { status: 502 })
   }
 }

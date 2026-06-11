@@ -17,9 +17,18 @@ import HeroShowcase from '@/components/landing/HeroShowcase'
 
 const NAV_LINKS = [
   { label: 'How it works', href: '#about' },
-  { label: 'Restaurants', href: '#work' },
+  { label: 'What fans do', href: '#work' },
   { label: 'Connect', href: '/login' },
 ]
+
+/** Smooth-scroll same-page anchors within the page's scroll container. */
+function scrollToHash(href: string) {
+  if (!href.startsWith('#')) return false
+  const el = document.getElementById(href.slice(1))
+  if (!el) return false
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  return true
+}
 
 /** Orange CTA with text-roll label and a white arrow circle that tilts on hover. */
 function OrangeCta({ href, label }: { href: string; label: string }) {
@@ -121,6 +130,7 @@ export default function HodariLanding() {
                   <Link
                     key={l.label}
                     href={l.href}
+                    onClick={(e) => { if (scrollToHash(l.href)) e.preventDefault() }}
                     className="text-[14px] text-gray-900 transition-colors duration-300 hover:text-gray-500 dark:text-gray-100 dark:hover:text-gray-400"
                   >
                     {l.label}
@@ -165,10 +175,10 @@ export default function HodariLanding() {
         {/* Hero content — pinned to the bottom of the viewport */}
         <div className="relative z-20 mx-auto w-full max-w-[1440px] px-5 pb-14 sm:px-8 sm:pb-16 lg:px-12 lg:pb-20">
           <p className="mb-5 text-[13px] tracking-wide text-gray-900 dark:text-gray-200 sm:mb-8 sm:text-[14px]">
-            Hodari — your AI companion for World Cup days
+            Hodari, your AI companion for World Cup days
           </p>
           <h1 className="max-w-[15ch] font-display font-semibold leading-[1.08] tracking-[-0.02em] text-gray-900 dark:text-gray-50 text-[clamp(1.75rem,7vw,4.2rem)] sm:text-[clamp(2.5rem,5vw,4.2rem)]">
-            Find a great place to eat, fast — in a city you&apos;ve never set&nbsp;foot&nbsp;in.
+            Find a great place to eat fast, in a city you&apos;ve never set&nbsp;foot&nbsp;in.
           </h1>
 
           <div className="mt-8 flex flex-col gap-4 sm:mt-12 sm:flex-row sm:items-center sm:gap-5">
@@ -213,7 +223,7 @@ export default function HodariLanding() {
                 <Link
                   key={l.label}
                   href={l.href}
-                  onClick={() => setMenuOpen(false)}
+                  onClick={(e) => { if (scrollToHash(l.href)) e.preventDefault(); setMenuOpen(false) }}
                   className="text-[28px] font-medium leading-[32px] text-gray-900 dark:text-gray-100"
                 >
                   {l.label}
@@ -233,14 +243,14 @@ export default function HodariLanding() {
           <h2 className="mb-12 px-5 font-display font-semibold leading-[1.12] tracking-[-0.01em] text-gray-900 dark:text-gray-50 text-[clamp(1.5rem,4vw,3.2rem)] sm:mb-16 sm:px-8 lg:mb-28 lg:px-12">
             “Four hours, $60, vegetarian near<br className="hidden sm:block" />
             <span className="sm:hidden"> </span>
-            the stadium” — that&apos;s all Hodari needs.
+            the stadium.” That&apos;s all Hodari needs.
           </h2>
 
           {/* Mobile / tablet */}
           <div className="px-5 sm:px-8 lg:hidden">
             <p className="text-[15px] font-medium leading-[1.6] text-gray-900 dark:text-gray-200 sm:text-[17px]">
-              Real restaurants from Google Maps — never made up — ranked to your
-              taste and ordered into a route you can actually walk: where to eat,
+              Real restaurants from Google Maps, never invented, ranked to your
+              taste and ordered into a route you can actually walk. Where to eat,
               what to see, how to get there.
             </p>
             <div className="mt-6">
@@ -297,18 +307,18 @@ export default function HodariLanding() {
             <Link href={ctaHref} className="block">
               <div className="group relative aspect-[329/246] cursor-pointer overflow-hidden rounded-2xl bg-[#1a1d2e]">
                 <img
-                  src="/landing/friends-dinner.jpg"
-                  alt="Friends sharing plates and wine around a restaurant table"
-                  className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                  src="/landing/worldcup-fans.png"
+                  alt="Fans in national team jerseys hanging out together before a match"
+                  className="h-full w-full object-cover object-[center_30%] transition-transform duration-700 ease-out group-hover:scale-105"
                 />
                 <ExpandingLightButton />
               </div>
               <p className="mt-4 text-[13px] leading-relaxed text-gray-600 dark:text-gray-400 sm:text-[14px]">
-                Lunch before kickoff — a table for the whole crew within a short
-                walk, matched to your budget and diet
+                Meet your crew in their colours, then walk to a table that fits
+                everyone&apos;s budget and diet.
               </p>
               <p className="mt-1 text-[14px] font-semibold text-gray-900 dark:text-gray-100 sm:text-[15px]">
-                Eat together — New York
+                Match day in New York
               </p>
             </Link>
 
@@ -322,11 +332,11 @@ export default function HodariLanding() {
                 <ExpandingDarkButton />
               </div>
               <p className="mt-4 text-[13px] leading-relaxed text-gray-600 dark:text-gray-400 sm:text-[14px]">
-                After the final whistle — Hodari routes you and your friends to
-                the city&apos;s best tables and gets you back safe
+                After the final whistle, Hodari routes you and your friends to the
+                city&apos;s best tables and gets you back safe.
               </p>
               <p className="mt-1 text-[14px] font-semibold text-gray-900 dark:text-gray-100 sm:text-[15px]">
-                Dinner after dark — Mexico City
+                Dinner after dark in Mexico City
               </p>
             </Link>
           </div>
@@ -338,13 +348,17 @@ export default function HodariLanding() {
         <div className="mx-auto flex max-w-[1440px] flex-col items-start justify-between gap-3 px-5 py-8 text-[13px] text-gray-600 dark:text-gray-400 sm:flex-row sm:items-center sm:px-8 lg:px-12">
           <span className="flex items-center gap-2.5">
             <HodariLogo className="h-7 w-7" />
-            © 2026 Hodari — built for the FIFA World Cup
+            © 2026 Hodari. Built for the FIFA World Cup.
           </span>
           <span className="flex items-center gap-5">
             <Link href="/login" className="transition-colors duration-300 hover:text-gray-900 dark:hover:text-gray-100">
               Sign in
             </Link>
-            <a href="#top" className="transition-colors duration-300 hover:text-gray-900 dark:hover:text-gray-100">
+            <a
+              href="#top"
+              onClick={(e) => { if (scrollToHash('#top')) e.preventDefault() }}
+              className="transition-colors duration-300 hover:text-gray-900 dark:hover:text-gray-100"
+            >
               Back to top
             </a>
           </span>

@@ -4,21 +4,21 @@ import { useEffect, useState } from 'react'
 import SpinningGlobe from '@/components/landing/SpinningGlobe'
 
 const PHOTOS = [
+  '/landing/worldcup-fans.png',
   '/landing/fans-bar.png',
-  '/landing/friends-terrace.jpg',
   '/landing/friends-toast.jpg',
 ]
 
 /**
- * Cinematic sequence: the globe holds the stage, crossfades into two photos,
- * returns to the globe, then the third photo — and loops. The globe dwells
- * longer than the photos.
+ * Cinematic sequence: the globe holds the stage, crossfades into the fan
+ * photos, returns to the globe, then the last photo, then loops. The globe
+ * dwells longer than the photos, and the lead fan shot gets extra time.
  */
 const SEQUENCE: Array<{ photo: number | null; dur: number }> = [
-  { photo: null, dur: 7000 },
-  { photo: 0, dur: 4200 },
+  { photo: null, dur: 6500 },
+  { photo: 0, dur: 4800 },
   { photo: 1, dur: 4200 },
-  { photo: null, dur: 7000 },
+  { photo: null, dur: 6500 },
   { photo: 2, dur: 4200 },
 ]
 

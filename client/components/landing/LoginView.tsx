@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Mail } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Mail, User } from 'lucide-react'
 import {
   EASE,
   HodariLogo,
@@ -19,20 +19,28 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export default function LoginView() {
   const router = useRouter()
   const { dark, toggle } = useLandingTheme()
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Prefill from a previous session so returning fans sign in with one tap.
   useEffect(() => {
-    const saved = localStorage.getItem('hodari_email')
-    if (saved) setEmail(saved)
+    const savedEmail = localStorage.getItem('hodari_email')
+    const savedName = localStorage.getItem('hodari_name')
+    if (savedEmail) setEmail(savedEmail)
+    if (savedName) setName(savedName)
   }, [])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const clean = email.trim().toLowerCase()
-    if (!EMAIL_RE.test(clean)) {
+    const cleanName = name.trim()
+    const cleanEmail = email.trim().toLowerCase()
+    if (cleanName.length < 2) {
+      setError('Enter your name or a username.')
+      return
+    }
+    if (!EMAIL_RE.test(cleanEmail)) {
       setError('Enter a valid email address.')
       return
     }
@@ -42,12 +50,13 @@ export default function LoginView() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: clean }),
+        body: JSON.stringify({ name: cleanName, email: cleanEmail }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Sign-in failed. Please try again.')
       localStorage.setItem('hodari_uid', data.user.user_id)
       localStorage.setItem('hodari_email', data.user.email)
+      if (data.user.name) localStorage.setItem('hodari_name', data.user.name)
       router.push('/chat')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign-in failed. Please try again.')
@@ -88,42 +97,64 @@ export default function LoginView() {
       <div className="relative z-20 flex flex-1 items-center justify-center px-5 pb-10">
         <div className="w-full max-w-[440px] rounded-3xl bg-white p-7 shadow-[0_24px_80px_rgba(0,0,0,0.16)] dark:bg-[#131318] dark:shadow-[0_24px_80px_rgba(0,0,0,0.65)] sm:p-10">
           <p className="mb-5 text-[13px] tracking-wide text-gray-600 dark:text-gray-400 sm:mb-7 sm:text-[14px]">
-            Hodari — your AI companion for World Cup days
+            Hodari, your AI companion for World Cup days
           </p>
           <h1 className="font-display font-semibold leading-[1.12] tracking-[-0.01em] text-gray-900 dark:text-gray-50 text-[clamp(1.6rem,5vw,2.3rem)]">
-            Sign in with<br />your email.
+            Sign in to Hodari.
           </h1>
           <p className="mt-4 text-[14px] leading-[1.6] text-gray-600 dark:text-gray-400">
             Your taste, dietary needs and saved places live in your fan profile,
             so every meal plan fits you. New here? We&apos;ll create one automatically.
           </p>
 
-          <form onSubmit={submit} className="mt-8">
-            <label htmlFor="login-email" className="mb-2 block text-[12px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-500">
-              Email address
-            </label>
-            <div className="flex items-center gap-2.5 rounded-full border border-gray-200 bg-white px-5 py-3 transition-colors duration-300 focus-within:border-[#F56A00] dark:border-white/15 dark:bg-white/5 dark:focus-within:border-[#F56A00]">
-              <Mail size={15} className="shrink-0 text-gray-400" />
-              <input
-                id="login-email"
-                type="email"
-                required
-                autoFocus
-                value={email}
-                onChange={(e) => { setEmail(e.target.value); setError(null) }}
-                placeholder="you@example.com"
-                className="w-full bg-transparent text-[14px] text-gray-900 outline-none placeholder:text-gray-400 dark:text-gray-100 dark:placeholder:text-gray-600"
-              />
+          <form onSubmit={submit} className="mt-8 space-y-5">
+            <div>
+              <label htmlFor="login-name" className="mb-2 block text-[12px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-500">
+                Name or username
+              </label>
+              <div className="flex items-center gap-2.5 rounded-full border border-gray-200 bg-white px-5 py-3 transition-colors duration-300 focus-within:border-[#F56A00] dark:border-white/15 dark:bg-white/5 dark:focus-within:border-[#F56A00]">
+                <User size={15} className="shrink-0 text-gray-400" />
+                <input
+                  id="login-name"
+                  type="text"
+                  required
+                  autoFocus
+                  autoComplete="name"
+                  value={name}
+                  onChange={(e) => { setName(e.target.value); setError(null) }}
+                  placeholder="Pacifique, or your handle"
+                  className="w-full bg-transparent text-[14px] text-gray-900 outline-none placeholder:text-gray-400 dark:text-gray-100 dark:placeholder:text-gray-600"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="login-email" className="mb-2 block text-[12px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-500">
+                Email address
+              </label>
+              <div className="flex items-center gap-2.5 rounded-full border border-gray-200 bg-white px-5 py-3 transition-colors duration-300 focus-within:border-[#F56A00] dark:border-white/15 dark:bg-white/5 dark:focus-within:border-[#F56A00]">
+                <Mail size={15} className="shrink-0 text-gray-400" />
+                <input
+                  id="login-email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => { setEmail(e.target.value); setError(null) }}
+                  placeholder="you@example.com"
+                  className="w-full bg-transparent text-[14px] text-gray-900 outline-none placeholder:text-gray-400 dark:text-gray-100 dark:placeholder:text-gray-600"
+                />
+              </div>
             </div>
 
             {error && (
-              <p className="mt-3 text-[13px] text-[#e05a1a]" role="alert">{error}</p>
+              <p className="text-[13px] text-[#e05a1a]" role="alert">{error}</p>
             )}
 
             <button
               type="submit"
               disabled={busy}
-              className="group mt-6 flex w-full items-center justify-between rounded-full bg-[#F56A00] py-2 pl-6 pr-2 text-[14px] font-medium text-white transition-colors duration-300 hover:bg-[#e05a1a] disabled:cursor-wait disabled:opacity-70"
+              className="group flex w-full items-center justify-between rounded-full bg-[#F56A00] py-2 pl-6 pr-2 text-[14px] font-medium text-white transition-colors duration-300 hover:bg-[#e05a1a] disabled:cursor-wait disabled:opacity-70"
             >
               <RollText>{busy ? 'Checking your profile…' : 'Continue'}</RollText>
               <span className={`flex h-8 w-8 items-center justify-center rounded-full bg-white text-[#F56A00] transition-transform duration-500 ${EASE} group-hover:-rotate-45`}>
@@ -133,8 +164,8 @@ export default function LoginView() {
           </form>
 
           <p className="mt-6 text-[12px] leading-[1.6] text-gray-400 dark:text-gray-600">
-            No passwords during the tournament — your email is only used to load
-            your saved preferences.
+            No passwords during the tournament. Your name and email only load your
+            saved preferences.
           </p>
         </div>
       </div>
