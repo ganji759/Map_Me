@@ -74,3 +74,17 @@ export function verifySession(token: string | undefined | null): SessionPayload 
 export function getSessionUser(req: NextRequest): string | null {
   return verifySession(req.cookies.get(SESSION_COOKIE)?.value)?.uid ?? null
 }
+
+/** The full verified session payload (uid + email), or null. */
+export function getSession(req: NextRequest): { uid: string; email?: string } | null {
+  const p = verifySession(req.cookies.get(SESSION_COOKIE)?.value)
+  return p ? { uid: p.uid, email: p.email } : null
+}
+
+export const SESSION_COOKIE_OPTS = {
+  httpOnly: true as const,
+  secure: true as const,
+  sameSite: 'lax' as const,
+  path: '/',
+  maxAge: SESSION_MAX_AGE,
+}

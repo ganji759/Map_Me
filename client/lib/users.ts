@@ -1,0 +1,69 @@
+/**
+ * Create-or-load a Hodari user by email, via the MongoDB MCP. Shared by the
+ * OAuth callback. Matches the existing `users` collection schema.
+ */
+import { mcpSession, mcpCall, ensureConnected, extractDocs } from '@/lib/mcp'
+
+const DB = process.env.MONGODB_DATABASE ?? 'hodari'
+
+export interface HodariUser {
+  user_id: string
+  name: string | null
+  email: string
+  home_country: string | null
+  languages: string[]
+  budget_tier: string
+}
+
+function publicUser(doc: Record<string, unknown>): HodariUser {
+  return {
+    user_id: String(doc.user_id),
+    name: (doc.name as string) ?? null,
+    email: String(doc.email),
+    home_country: (doc.home_country as string) ?? null,
+    languages: (doc.languages as string[]) ?? ['en'],
+    budget_tier: (doc.budget_tier as string) ?? 'moderate',
+  }
+}
+
+function slugifyId(name: string, email: string): string {
+  const base = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+  return base || email.split('@')[0].replace(/[^a-z0-9_]/g, '') || 'fan'
+}
+
+/** Look up the user by email; create the profile on first sign-in. */
+export async function findOrCreateUser(email: string, name: string): Promise<HodariUser> {
+  const cleanEmail = email.trim().toLowerCase()
+  const cleanName = name.trim() || cleanEmail.split('@')[0]
+
+  const sid = await mcpSession()
+  await ensureConnected(sid)
+
+  const existing = extractDocs(
+    await mcpCall(sid, 'find', { database: DB, collection: 'users', filter: { email: cleanEmail }, limit: 1 }),
+  )
+  if (existing.length > 0) {
+    const doc = existing[0]
+    if (doc.name !== cleanName) {
+      await mcpCall(sid, 'update-many', {
+        database: DB, collection: 'users', filter: { email: cleanEmail }, update: { $set: { name: cleanName } },
+      })
+      doc.name = cleanName
+    }
+    return publicUser(doc)
+  }
+
+  let userId = slugifyId(cleanName, cleanEmail)
+  const clash = extractDocs(
+    await mcpCall(sid, 'find', { database: DB, collection: 'users', filter: { user_id: userId }, limit: 1 }),
+  )
+  if (clash.length > 0) userId = `${userId}_${Math.random().toString(36).slice(2, 6)}`
+
+  const doc = {
+    user_id: userId, name: cleanName, email: cleanEmail,
+    home_country: null, languages: ['en'], dietary: [], budget_tier: 'moderate', accessibility: [],
+    created_at: new Date().toISOString(),
+  }
+  await mcpCall(sid, 'insert-many', { database: DB, collection: 'users', documents: [doc] })
+  return publicUser(doc)
+}

@@ -143,7 +143,9 @@ Create an Atlas DB user scoped to the `hodari` DB with `readWrite` only (no
 - [ ] P1.1b extend rate limiting to `/api/voice` and the photo proxies
 - [ ] P1.2 referrer-lock the browser Maps key (console)
 - [ ] P1.3 least-privilege Atlas DB user
-- [ ] P0.4 magic-link / OAuth login (scoped separately)
+- [~] P0.4 **Google OAuth login (in progress)** — replaces the passwordless
+      email login (now removed). Needs an OAuth client + the two secrets set, then
+      deploy. Lets any Google user sign in once the consent screen is published.
 - [ ] P2 security headers / CSP, photo-proxy host allowlist, Atlas allowlist, audit logs
 
 ---

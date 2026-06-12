@@ -15,7 +15,7 @@ spec:
       serviceAccountName: hodari-agent@mapsme-498314.iam.gserviceaccount.com
       containers:
       - name: hodari-frontend
-        image: us-central1-docker.pkg.dev/mapsme-498314/hodari/frontend@sha256:9169d28519c400f59a5de3381348ad6d55c9cf246d0aa593c2c58f0efa96b22b
+        image: us-central1-docker.pkg.dev/mapsme-498314/hodari/frontend@sha256:2e7c21521cf0ec1d9c93c7b4c7d7ac1f3b515a595eb0f863b39683b40471dcb0
         ports:
         - containerPort: 3000
         resources:
@@ -53,6 +53,18 @@ spec:
           valueFrom:
             secretKeyRef:
               name: HODARI_SESSION_SECRET
+              key: latest
+        # Google OAuth (sign-in). Set the real values in Secret Manager before
+        # deploying this revision, or sign-in shows "not set up".
+        - name: GOOGLE_OAUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: GOOGLE_OAUTH_CLIENT_ID
+              key: latest
+        - name: GOOGLE_OAUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: GOOGLE_OAUTH_CLIENT_SECRET
               key: latest
 
       # ── MongoDB MCP sidecar (for login route) ─────────────────────────────

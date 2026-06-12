@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowRight, Loader2, Mail, MapPin, Star, User, Utensils } from 'lucide-react'
+import { ArrowLeft, Loader2, MapPin, Star, Utensils } from 'lucide-react'
 import {
   EASE,
   HodariLogo,
@@ -14,60 +13,48 @@ import {
 } from '@/components/landing/bits'
 import HeroMap from '@/components/landing/HeroMap'
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
 const VALUE_POINTS = [
   { Icon: MapPin, text: 'Grounded by Google Maps, real places, never invented' },
   { Icon: Utensils, text: 'Restaurant-first plans built around your match days' },
   { Icon: Star, text: 'Learns your taste with every trip' },
 ]
 
+const ERROR_MESSAGES: Record<string, string> = {
+  oauth_unconfigured: 'Google sign-in is not set up yet. Please try again soon.',
+  oauth_state: 'Your sign-in session expired. Please try again.',
+  oauth_denied: 'Sign-in was cancelled.',
+  oauth_email: 'Could not get a verified email from Google.',
+  oauth_token: 'Sign-in failed. Please try again.',
+  oauth_failed: 'Sign-in failed. Please try again.',
+  rate: 'Too many attempts. Please wait a moment and try again.',
+}
+
+/** Google "G" mark. */
+function GoogleMark() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+      <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62Z" />
+      <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.34A9 9 0 0 0 9 18Z" />
+      <path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.94H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.06l3.01-2.34Z" />
+      <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.59C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.94l3.01 2.34C4.68 5.16 6.66 3.58 9 3.58Z" />
+    </svg>
+  )
+}
+
 export default function LoginView() {
-  const router = useRouter()
   const { dark, toggle } = useLandingTheme()
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Prefill from a previous session so returning fans sign in with one tap.
+  // Surface OAuth errors passed back as ?error=… on the redirect.
   useEffect(() => {
-    const savedEmail = localStorage.getItem('hodari_email')
-    const savedName = localStorage.getItem('hodari_name')
-    if (savedEmail) setEmail(savedEmail)
-    if (savedName) setName(savedName)
+    const code = new URLSearchParams(window.location.search).get('error')
+    if (code) setError(ERROR_MESSAGES[code] ?? 'Sign-in failed. Please try again.')
   }, [])
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const cleanName = name.trim()
-    const cleanEmail = email.trim().toLowerCase()
-    if (cleanName.length < 2) {
-      setError('Enter your name or a username.')
-      return
-    }
-    if (!EMAIL_RE.test(cleanEmail)) {
-      setError('Enter a valid email address.')
-      return
-    }
+  const signInWithGoogle = () => {
     setBusy(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: cleanName, email: cleanEmail }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Sign-in failed. Please try again.')
-      localStorage.setItem('hodari_uid', data.user.user_id)
-      localStorage.setItem('hodari_email', data.user.email)
-      if (data.user.name) localStorage.setItem('hodari_name', data.user.name)
-      router.push('/chat')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign-in failed. Please try again.')
-      setBusy(false)
-    }
+    window.location.href = '/api/auth/google'
   }
 
   return (
@@ -137,66 +124,32 @@ export default function LoginView() {
             Sign in to Hodari.
           </h2>
           <p className="mt-2 text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
-            No password needed. Your fan profile follows your email.
+            Continue with Google. Your fan profile and saved places follow your account.
           </p>
 
-          <form onSubmit={submit} className="mt-7 space-y-5">
-            <div>
-              <label htmlFor="login-name" className="mb-2 block text-[12px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-500">
-                Name or username
-              </label>
-              <div className="flex items-center gap-2.5 rounded-full border border-gray-200 bg-white px-5 py-3 transition-colors duration-300 focus-within:border-[#F56A00] focus-within:ring-1 focus-within:ring-[#F56A00] dark:border-white/15 dark:bg-white/5 dark:focus-within:border-[#F56A00]">
-                <User size={15} className="shrink-0 text-gray-400" />
-                <input
-                  id="login-name"
-                  type="text"
-                  required
-                  autoFocus
-                  autoComplete="name"
-                  value={name}
-                  onChange={(e) => { setName(e.target.value); setError(null) }}
-                  placeholder="Pacifique, or your handle"
-                  className="w-full bg-transparent text-[14px] text-gray-900 outline-none placeholder:text-gray-400 dark:text-gray-100 dark:placeholder:text-gray-600"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="login-email" className="mb-2 block text-[12px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-500">
-                Email address
-              </label>
-              <div className="flex items-center gap-2.5 rounded-full border border-gray-200 bg-white px-5 py-3 transition-colors duration-300 focus-within:border-[#F56A00] focus-within:ring-1 focus-within:ring-[#F56A00] dark:border-white/15 dark:bg-white/5 dark:focus-within:border-[#F56A00]">
-                <Mail size={15} className="shrink-0 text-gray-400" />
-                <input
-                  id="login-email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => { setEmail(e.target.value); setError(null) }}
-                  placeholder="you@example.com"
-                  className="w-full bg-transparent text-[14px] text-gray-900 outline-none placeholder:text-gray-400 dark:text-gray-100 dark:placeholder:text-gray-600"
-                />
-              </div>
-            </div>
-
+          <div className="mt-7 space-y-4">
             {error && (
               <p className="text-[13px] text-[#e05a1a]" role="alert">{error}</p>
             )}
 
             <button
-              type="submit"
+              type="button"
+              onClick={signInWithGoogle}
               disabled={busy}
-              className="group flex w-full items-center justify-between rounded-full bg-[#F56A00] py-2 pl-6 pr-2 text-[14px] font-medium text-white transition-colors duration-300 hover:bg-[#e05a1a] disabled:cursor-wait disabled:opacity-70"
+              className="flex w-full items-center justify-center gap-3 rounded-full border border-gray-300 bg-white py-3.5 text-[14px] font-medium text-gray-700 shadow-sm transition-colors duration-200 hover:bg-gray-50 disabled:cursor-wait disabled:opacity-70 dark:border-white/15 dark:bg-white/5 dark:text-gray-100 dark:hover:bg-white/10"
             >
-              <RollText>{busy ? 'Checking your profile…' : 'Continue'}</RollText>
-              <span className={`flex h-8 w-8 items-center justify-center rounded-full bg-white text-[#F56A00] transition-transform duration-500 ${EASE} group-hover:-rotate-45`}>
-                {busy
-                  ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" />
-                  : <ArrowRight size={14} />}
-              </span>
+              {busy ? (
+                <Loader2 size={16} className="animate-spin motion-reduce:animate-none" />
+              ) : (
+                <GoogleMark />
+              )}
+              {busy ? 'Redirecting to Google…' : 'Continue with Google'}
             </button>
-          </form>
+
+            <p className="text-center text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
+              We only use your name and email to build your profile.
+            </p>
+          </div>
         </div>
       </main>
     </div>
