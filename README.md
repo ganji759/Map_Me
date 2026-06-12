@@ -248,8 +248,8 @@ gcloud run services add-iam-policy-binding hodari-agent   --member="allUsers" --
 
 ## Build phasing
 
-- **MVP (current)** — Orchestrator → Explorer (`search_places`) → Itinerary (`compute_routes`), all in one process. Personalization re-ranks Maps candidates against the `interactions` history.
-- **Phase 2** — vectorized `places` collection + Atlas Vector Search, per-agent Cloud Run services, weather-driven itineraries.
+- **MVP (current)** — all four agents (Orchestrator → Planner → Explorer → Itinerary) run in one process with in-process routing. Explorer calls `search_places` via Maps MCP; Itinerary calls `compute_routes`. Personalization re-ranks Maps candidates against the `interactions` history (no vector DB yet).
+- **Phase 2** — vectorized `places` collection + Atlas Vector Search, per-agent Cloud Run services, `lookup_weather`-driven itineraries.
 
 See [`Hodari_System_Architecture.md`](./Hodari_System_Architecture.md) for the full spec.
 
