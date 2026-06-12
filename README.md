@@ -16,7 +16,7 @@
 - **Place photos** — restaurant and venue photos are auto-fetched from the Places API and shown directly on the sidebar cards.
 - **Save places** — bookmark any place from the sidebar; saved items persist per user. Access them at `/saved`.
 - **Visit planner** — on the Saved page, set a visit date and note for each saved place. A calendar view groups planned visits by month.
-- **Personalization** — interaction signals (liked, saved, visited) are stored per user in MongoDB and used to re-rank future suggestions.
+- **Personalization** — the Explorer agent calls `find_similar_preferences` (Atlas Vector Search on the `interactions` collection) to score candidates against the user's past liked/visited/disliked places before returning results.
 - **Interactive map** — custom pins, route polylines, expandable place cards, full-screen mode, and per-place follow-up chat.
 - **Push-to-talk voice** — server-side Gemini STT + TTS via Vertex AI.
 - **Chat history with delete** — conversations are saved in the browser; hover any entry in the sidebar to delete it.
@@ -52,7 +52,7 @@ Inter-agent contracts are Pydantic schemas with one retry on malformed output: `
 |---|---|---|---|
 | **Orchestrator** | user message + profile + history | streamed reply | `load_user_profile`, `save_preference` (MongoDB MCP) |
 | **Planner** | request + profile | `Plan` | none — pure reasoning |
-| **Explorer / Map** | `Plan` | `CandidateSet` | `search_places` (Maps MCP), `find_similar_preferences` (Mongo) |
+| **Explorer / Map** | `Plan` | `CandidateSet` | `find_similar_preferences` (interactions vector search), `find_places_by_vector` (places vector search), `search_places` (Maps MCP — live fallback) |
 | **Itinerary** | `Plan` + `CandidateSet` | `Itinerary` | `compute_routes`, `lookup_weather` (Maps MCP) |
 
 ### Production deployment
@@ -79,7 +79,9 @@ Cloud Run service definitions live in `infra/`. Secrets (MongoDB URI, Maps API k
 | Map UI | Google Maps JavaScript API + Places API |
 | Agent runtime | Python 3.12, Google Agent Development Kit (ADK) |
 | LLM | Gemini 3.5 Flash via Vertex AI (`global` endpoint) |
+| Embeddings | Vertex AI `text-embedding-004` (768 dimensions) |
 | Database | MongoDB Atlas — `users`, `places`, `interactions` |
+| Vector search | Atlas Vector Search (HNSW, cosine) — two indexes: `places_embedding` + `interactions_embedding` |
 | DB access | MongoDB MCP Server (sidecar, no direct driver) |
 | Maps grounding | Maps Grounding Lite MCP (`https://mapstools.googleapis.com/mcp`) |
 | Schemas | Pydantic |
@@ -248,8 +250,8 @@ gcloud run services add-iam-policy-binding hodari-agent   --member="allUsers" --
 
 ## Build phasing
 
-- **MVP (current)** — all four agents (Orchestrator → Planner → Explorer → Itinerary) run in one process with in-process routing. Explorer calls `search_places` via Maps MCP; Itinerary calls `compute_routes`. Personalization re-ranks Maps candidates against the `interactions` history (no vector DB yet).
-- **Phase 2** — vectorized `places` collection + Atlas Vector Search, per-agent Cloud Run services, `lookup_weather`-driven itineraries.
+- **MVP (current)** — all four agents (Orchestrator → Planner → Explorer → Itinerary) run in one process with in-process routing. The Explorer runs three tools in parallel: vector search on the seeded `places` collection, vector search on the user's `interactions` history for personalization, and a live `search_places` call via Maps MCP as a fallback. Embeddings are generated on demand via Vertex AI `text-embedding-004`.
+- **Phase 2** — per-agent Cloud Run services (independent scaling), expanded `places` seed coverage, `lookup_weather`-driven itinerary adjustments.
 
 See [`Hodari_System_Architecture.md`](./Hodari_System_Architecture.md) for the full spec.
 
