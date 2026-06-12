@@ -66,6 +66,10 @@ spec:
             secretKeyRef:
               name: GOOGLE_OAUTH_CLIENT_SECRET
               key: latest
+        # Pins the OAuth redirect URI so it always matches what's registered in
+        # the Google OAuth client (avoids redirect_uri mismatch across URLs).
+        - name: PUBLIC_BASE_URL
+          value: https://hodari-frontend-377773225771.us-central1.run.app
 
       # ── MongoDB MCP sidecar (for login route) ─────────────────────────────
       - name: mongodb-mcp
