@@ -42,7 +42,7 @@ export function CollapsibleMessage({ content, streaming = false, showCaret = fal
           exit={reduced ? undefined : { opacity: 0.85 }}
           transition={{ duration: reduced ? 0 : 0.25, ease: [0.22, 1, 0.36, 1] }}
         >
-          <div className="prose-hodari w-full text-left text-[13px] leading-relaxed text-[var(--text-primary)]">
+          <div className="prose-hodari w-full text-left text-[14px] leading-relaxed text-[var(--text-primary)]">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{visible}</ReactMarkdown>
             {showCaret && <span className="stream-caret stream-caret-fade" aria-hidden />}
           </div>
@@ -52,7 +52,7 @@ export function CollapsibleMessage({ content, streaming = false, showCaret = fal
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="mt-2 flex items-center gap-1 text-[11px] font-medium text-amber-600 hover:text-amber-700 dark:text-amber-500"
+          className="mt-2 flex items-center gap-1 text-[11px] font-medium text-[#F56A00] transition-colors hover:text-[#D45400] dark:text-[#FF8C2F] dark:hover:text-[#FFA94D]"
         >
           {expanded ? 'Show less' : 'Show more'}
           <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? 'rotate-180' : ''}`} />
@@ -76,15 +76,15 @@ export function CollapsedReply({ content, loading, streaming, onOpen, hideOpenCh
   const showThinking = loading && !streaming && !content
 
   return (
-    <div className="pointer-events-auto absolute left-4 top-4 z-20 w-[340px] max-w-[80vw] animate-fade-up overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-header)]/95 shadow-lg backdrop-blur-md">
+    <div className="pointer-events-auto absolute left-4 top-4 z-20 w-[340px] max-w-[80vw] animate-fade-up overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-header)]/95 shadow-[0_8px_30px_rgba(0,0,0,0.12)] backdrop-blur-md dark:shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
       <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-2.5">
-        <span className="text-[11px] font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400">Hodari</span>
+        <span className="text-[11px] font-medium uppercase tracking-wider text-[#F56A00] dark:text-[#FF8C2F]">Hodari</span>
         {!hideOpenChat && (
           <button
             type="button"
             onClick={onOpen}
             title="Open full chat"
-            className="text-[11px] text-gray-500 transition-colors hover:text-amber-600 dark:text-gray-400"
+            className="text-[11px] text-gray-500 transition-colors hover:text-[#F56A00] dark:text-gray-400 dark:hover:text-[#FF8C2F]"
           >
             Open chat
           </button>
@@ -100,7 +100,7 @@ export function CollapsedReply({ content, loading, streaming, onOpen, hideOpenCh
         ) : content ? (
           <CollapsibleMessage content={content} streaming={streaming} showCaret={streaming} />
         ) : (
-          <p className="text-[13px] leading-relaxed text-gray-500">
+          <p className="text-[14px] leading-relaxed text-gray-500">
             Tap the mic and ask me anything — your reply shows up here.
           </p>
         )}

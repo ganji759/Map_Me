@@ -6,19 +6,19 @@
 
 /* ── Hodari theme tokens (light default) ───────────────────────────────────── */
 :root {
-  --bg-chat: #FDF8F0;
+  --bg-chat: #F5F5F5;
   --bg-sidebar: #ffffff;
   --bg-header: #ffffff;
   --text-primary: #111827;
   --text-secondary: #6B7280;
   --bubble-ai: #ffffff;
-  --bubble-user: #FEF3C7;
+  --bubble-user: #FFE8D5;
   --border: #E5E7EB;
 
-  --color-bg:       253 248 240;
+  --color-bg:       245 245 245;
   --color-surface:  255 255 255;
-  --color-surface2: 243 240 234;
-  --color-surface3: 235 231 222;
+  --color-surface2: 239 239 239;
+  --color-surface3: 229 229 229;
   --color-text:     17 24 39;
   --color-text2:    107 114 128;
   --color-text3:    156 163 175;
@@ -26,23 +26,23 @@
 }
 
 .dark {
-  --bg-chat: #1A1612;
-  --bg-sidebar: #111827;
-  --bg-header: #111827;
+  --bg-chat: #0a0a0d;
+  --bg-sidebar: #15151a;
+  --bg-header: #15151a;
   --text-primary: #F9FAFB;
   --text-secondary: #9CA3AF;
-  --bubble-ai: #1E293B;
-  --bubble-user: rgba(180, 83, 9, 0.25);
-  --border: #374151;
+  --bubble-ai: #15151a;
+  --bubble-user: rgba(245, 106, 0, 0.18);
+  --border: #26262e;
 
-  --color-bg:       26 22 18;
-  --color-surface:  30 41 59;
-  --color-surface2: 17 24 39;
-  --color-surface3: 55 65 81;
+  --color-bg:       10 10 13;
+  --color-surface:  21 21 26;
+  --color-surface2: 14 14 18;
+  --color-surface3: 38 38 46;
   --color-text:     249 250 251;
   --color-text2:    156 163 175;
   --color-text3:    107 114 128;
-  --color-border:   55 65 81;
+  --color-border:   38 38 46;
 }
 
 /* ── Page shell ─────────────────────────────────────────────────────────── */
@@ -57,11 +57,11 @@ body {
 }
 
 .dark body {
-  background: radial-gradient(ellipse at 20% 15%, #130D08 0%, #0C0C0E 45%, #08080F 100%);
+  background: radial-gradient(ellipse at 20% 15%, #111118 0%, #0a0a0d 55%, #08080b 100%);
 }
 
 :root:not(.dark) body {
-  background: radial-gradient(ellipse at 20% 15%, #FFF5E8 0%, #F8F6F0 50%, #F0EEF8 100%);
+  background: radial-gradient(ellipse at 20% 15%, #FFFFFF 0%, #F5F5F5 50%, #EDEDED 100%);
 }
 
 /* ── Grain texture overlay ────────────────────────────────────────────────── */
@@ -76,17 +76,63 @@ body::before {
   background-size: 200px 200px;
 }
 
-/* ── Landing-page hero Ken Burns drift ─────────────────────────────────────── */
-@keyframes hero-kenburns {
-  from { transform: scale(1.04); }
-  to   { transform: scale(1.16); }
+/* ── Landing-page cinematics ──────────────────────────────────────────────── */
+@keyframes hero-map-drift {
+  from { transform: scale(1.08) translate3d(0.6%, 1.2%, 0); }
+  to   { transform: scale(1.2) translate3d(-1.2%, -2.2%, 0); }
 }
-.hero-kenburns {
-  animation: hero-kenburns 14s ease-in-out infinite alternate;
+.hero-map-drift {
+  animation: hero-map-drift 26s ease-in-out infinite alternate;
   will-change: transform;
 }
+
+@keyframes hero-glow-pulse {
+  0%, 100% { opacity: 0.65; transform: scale(1); }
+  50%      { opacity: 1; transform: scale(1.04); }
+}
+.hero-glow-pulse { animation: hero-glow-pulse 9s ease-in-out infinite; }
+
+@keyframes hero-sheen {
+  0%        { transform: translateX(-140%) skewX(-18deg); opacity: 0; }
+  6%        { opacity: 1; }
+  18%, 100% { transform: translateX(340%) skewX(-18deg); opacity: 0; }
+}
+.hero-sheen {
+  animation: hero-sheen 11s ease-in-out 2s infinite;
+  will-change: transform;
+}
+
+@keyframes hero-chip-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-9px); }
+}
+.hero-chip-float { animation: hero-chip-float 7s ease-in-out infinite; }
+.hero-chip-float-late { animation: hero-chip-float 8.5s ease-in-out 1.6s infinite; }
+
+/* Feathered edges so the hero map melts into the page background */
+.hero-map-mask {
+  -webkit-mask-image: radial-gradient(115% 115% at 50% 44%, #000 52%, transparent 76%);
+  mask-image: radial-gradient(115% 115% at 50% 44%, #000 52%, transparent 76%);
+}
+
+/* Infinite showcase belt: track holds two copies, loops by half its width */
+@keyframes landing-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.landing-marquee {
+  animation: landing-marquee 52s linear infinite;
+  will-change: transform;
+}
+.landing-marquee-pausable:hover .landing-marquee { animation-play-state: paused; }
+
 @media (prefers-reduced-motion: reduce) {
-  .hero-kenburns { animation: none; }
+  .hero-map-drift,
+  .hero-glow-pulse,
+  .hero-sheen,
+  .hero-chip-float,
+  .hero-chip-float-late,
+  .landing-marquee { animation: none; }
 }
 
 /* ── Landing-page liquid glass utilities ──────────────────────────────────── */
@@ -126,11 +172,11 @@ body::before {
 .chat-scroll::-webkit-scrollbar { width: 5px; }
 .chat-scroll::-webkit-scrollbar-track { background: transparent; }
 .chat-scroll::-webkit-scrollbar-thumb {
-  background: #D97706;
+  background: #F56A00;
   border-radius: 99px;
 }
 .dark .chat-scroll::-webkit-scrollbar-thumb {
-  background: #92400E;
+  background: #C44A00;
 }
 
 .scrollbar-hide::-webkit-scrollbar { display: none; }
@@ -224,8 +270,8 @@ body::before {
   height: 14px;
   border-radius: 50%;
   border: 1.5px solid rgba(245, 106, 0, 0.18);
-  border-top-color: #D97706;
-  border-right-color: rgba(217, 119, 6, 0.55);
+  border-top-color: #F56A00;
+  border-right-color: rgba(245, 106, 0, 0.55);
   animation: orb-spin 0.7s linear infinite;
   flex-shrink: 0;
 }
@@ -242,7 +288,7 @@ body::before {
 
 .prose-hodari ul { margin: 0.5rem 0; padding: 0; list-style: none; }
 .prose-hodari ul > li { display: flex; gap: 0.5rem; font-size: 0.8125rem; line-height: 1.6; margin-bottom: 0.3rem; color: var(--text-primary); }
-.prose-hodari ul > li > .bullet { color: rgba(217, 119, 6, 0.55); flex-shrink: 0; font-size: 1em; line-height: 1.6; }
+.prose-hodari ul > li > .bullet { color: rgba(245, 106, 0, 0.55); flex-shrink: 0; font-size: 1em; line-height: 1.6; }
 .prose-hodari ul > li:last-child { margin-bottom: 0; }
 
 .prose-hodari ol { margin: 0.65rem 0; padding-left: 1.5rem; list-style: decimal; text-align: left; }
@@ -259,7 +305,7 @@ body::before {
 }
 .prose-hodari h1 { font-size: 1rem; }
 .prose-hodari h2 { font-size: 0.9375rem; }
-.prose-hodari h3 { font-size: 0.8125rem; font-family: 'DM Mono', Menlo, monospace; letter-spacing: 0.08em; text-transform: uppercase; color: #D97706; font-weight: 500; }
+.prose-hodari h3 { font-size: 0.8125rem; font-family: 'DM Mono', Menlo, monospace; letter-spacing: 0.08em; text-transform: uppercase; color: #F56A00; font-weight: 500; }
 
 .prose-hodari code {
   font-family: 'DM Mono', Menlo, monospace;
@@ -267,11 +313,11 @@ body::before {
   background: rgb(var(--color-surface2));
   border-radius: 0.25rem;
   padding: 0.125rem 0.375rem;
-  color: rgba(217, 119, 6, 0.85);
+  color: rgba(245, 106, 0, 0.85);
   border: 1px solid var(--border);
 }
 .prose-hodari blockquote {
-  border-left: 2px solid rgba(217, 119, 6, 0.3);
+  border-left: 2px solid rgba(245, 106, 0, 0.3);
   padding-left: 0.75rem;
   font-style: italic;
   color: var(--text-secondary);
@@ -282,7 +328,7 @@ body::before {
   border-top: 1px solid var(--border);
   margin: 0.75rem 0;
 }
-.prose-hodari a { color: #D97706; text-decoration: none; }
+.prose-hodari a { color: #F56A00; text-decoration: none; }
 .prose-hodari a:hover { text-decoration: underline; }
 
 /* ── Glassmorphism ────────────────────────────────────────────────────────── */
@@ -299,8 +345,8 @@ body::before {
   box-shadow: 0 12px 32px -14px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.70);
 }
 .glass-active {
-  border-color: rgba(217, 119, 6, 0.55);
-  box-shadow: 0 14px 40px -10px rgba(217, 119, 6, 0.30), 0 0 0 1px rgba(217, 119, 6, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  border-color: rgba(245, 106, 0, 0.55);
+  box-shadow: 0 14px 40px -10px rgba(245, 106, 0, 0.30), 0 0 0 1px rgba(245, 106, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
 
 /* ── Streaming caret ──────────────────────────────────────────────────────── */
@@ -311,7 +357,7 @@ body::before {
   margin-left: 3px;
   vertical-align: -2px;
   border-radius: 1px;
-  background: #D97706;
+  background: #F56A00;
   animation: caret-blink 1s steps(1, end) infinite;
 }
 

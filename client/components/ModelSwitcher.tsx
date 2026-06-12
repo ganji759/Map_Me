@@ -38,8 +38,8 @@ export const MODELS: ModelConfig[] = [
     name: 'Claude Opus 4',
     provider: 'Anthropic',
     tag: 'Soon',
-    color: '#D4A574',
-    dot: 'bg-[#D4A574]',
+    color: '#F56A00',
+    dot: 'bg-[#F56A00]',
     available: false,
   },
 ]

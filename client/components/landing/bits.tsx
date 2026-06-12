@@ -1,9 +1,56 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Clock } from 'lucide-react'
 
 export const EASE = 'ease-[cubic-bezier(0.25,0.1,0.25,1)]'
+
+/**
+ * Scroll-triggered reveal: fades + lifts children the first time they enter
+ * the viewport. With reduced motion the content is simply visible.
+ */
+export function Reveal({
+  children,
+  className = '',
+  delay = 0,
+}: {
+  children: ReactNode
+  className?: string
+  delay?: number
+}) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [shown, setShown] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setShown(true)
+      return
+    }
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShown(true)
+          io.disconnect()
+        }
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -8% 0px' },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+
+  return (
+    <div
+      ref={ref}
+      style={{ transitionDelay: `${delay}ms` }}
+      className={`transition-all duration-700 motion-reduce:transition-none ${EASE} ${shown ? 'translate-y-0 opacity-100' : 'translate-y-7 opacity-0'} ${className}`}
+    >
+      {children}
+    </div>
+  )
+}
 
 /** Theme state shared with the chat app — same `hodari_theme` key + `.dark` class. */
 export function useLandingTheme() {

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { APIProvider, Map, AdvancedMarker, Pin, useMap } from '@vis.gl/react-google-maps'
-import { AlertCircle, ChevronLeft, ChevronDown, Loader2, MapPin, Maximize2, Minimize2, Star } from 'lucide-react'
+import { AlertCircle, ChevronLeft, Loader2, MapPin, Maximize2, Minimize2, Star } from 'lucide-react'
 import type { ItineraryStop, Place, Theme } from '@/lib/types'
 import type { CustomRouteConfig, TravelMode } from '@/lib/mapActions'
 import {
@@ -18,7 +18,33 @@ const ROUTE_ORANGE = '#F56A00'
 const KIGALI_DEFAULT: LatLng = { lat: -1.9441, lng: 30.0619 }
 const DEFAULT_ZOOM = 13
 
+/** 3D camera defaults — vector maps get true perspective, raster falls back to 45° imagery. */
+const VECTOR_3D_TILT = 55
+const RASTER_3D_TILT = 45
+const DEFAULT_3D_HEADING = 20
+
 type FitPadding = number | { top: number; right: number; bottom: number; left: number }
+
+/**
+ * Per-map cancel hooks so programmatic fits (PreciseMapFit / MapZoomFocus /
+ * route fitBounds) never fight the cinematic camera animations.
+ */
+const cameraInterrupts = new WeakMap<google.maps.Map, () => void>()
+
+function cancelCameraMotion(map: google.maps.Map | null | undefined) {
+  if (!map) return
+  cameraInterrupts.get(map)?.()
+}
+
+/** Once the user gestures on the map, never auto-orbit again this session. */
+let orbitStoppedForSession = false
+
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  )
+}
 
 /** Standard light roadmap — no orange tint on land/water (orange only on route + pins). */
 const MAP_STYLES: google.maps.MapTypeStyle[] = [
@@ -205,6 +231,7 @@ function markerSetKey(markers: LatLng[], userLocation: LatLng | null, includeUse
 function PlacesMapCenter({ places }: { places: LatLng[] }) {
   const map = useMap()
   const placesKey = places.map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join('|')
+  const lastCenterKey = useRef('')
 
   useEffect(() => {
     if (!map || places.length === 0) return
@@ -212,6 +239,12 @@ function PlacesMapCenter({ places }: { places: LatLng[] }) {
     const valid = places.filter(isValidCoord)
     if (valid.length === 0) return
 
+    // Only re-center when the place set actually changes — not on unrelated
+    // re-renders (e.g. map-mode switches), which would stomp the camera.
+    if (lastCenterKey.current === placesKey) return
+    lastCenterKey.current = placesKey
+
+    cancelCameraMotion(map)
     const first = valid[0]
     map.setCenter(first)
     map.setZoom(15)
@@ -251,6 +284,7 @@ function PreciseMapFit({
     if (lastFitKey.current === fitKey) return
     lastFitKey.current = fitKey
 
+    cancelCameraMotion(map)
     const isFull = size === 'full'
     fitMapPrecisely(map, valid, {
       padding: isFull
@@ -288,6 +322,7 @@ function MapZoomFocus({
     const focusKey = `${position.lat.toFixed(5)},${position.lng.toFixed(5)}@${targetZoom}`
     if (lastFocusKey.current === focusKey) return
     lastFocusKey.current = focusKey
+    cancelCameraMotion(map)
     map.setCenter(position)
     map.setZoom(targetZoom)
   }, [map, position?.lat, position?.lng, enabled, targetZoom])
@@ -295,12 +330,13 @@ function MapZoomFocus({
   return null
 }
 
-const MAP_TYPE_OPTIONS = [
-  { id: 'roadmap', label: 'Map' },
+type MapDisplayMode = '3d' | 'map' | 'satellite'
+
+const MAP_MODE_OPTIONS: { id: MapDisplayMode; label: string }[] = [
+  { id: '3d', label: '3D' },
+  { id: 'map', label: 'Map' },
   { id: 'satellite', label: 'Satellite' },
-  { id: 'hybrid', label: 'Hybrid' },
-  { id: 'terrain', label: 'Terrain' },
-] as const
+]
 
 function MapUiOptions({ fullControls }: { fullControls: boolean }) {
   const map = useMap()
@@ -327,54 +363,264 @@ function MapUiOptions({ fullControls }: { fullControls: boolean }) {
   return null
 }
 
-function MapTypeSelectControl() {
+/** Segmented pill control — brand-styled replacement for the old map-type <select>. */
+function MapModeControl({
+  mode,
+  onChange,
+}: {
+  mode: MapDisplayMode
+  onChange: (mode: MapDisplayMode) => void
+}) {
+  return (
+    <div className="pointer-events-none absolute left-1/2 top-4 z-[58] -translate-x-1/2">
+      <div
+        role="group"
+        aria-label="Map mode"
+        className="pointer-events-auto flex items-center gap-0.5 rounded-full border border-gray-200 bg-white/95 p-1 shadow-[0_2px_12px_rgba(0,0,0,0.06)] backdrop-blur dark:border-white/10 dark:bg-[#15151a]/95 dark:shadow-[0_2px_12px_rgba(0,0,0,0.5)]"
+      >
+        {MAP_MODE_OPTIONS.map((opt) => {
+          const active = mode === opt.id
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onChange(opt.id)}
+              className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium tracking-tight transition-colors motion-reduce:transition-none ${
+                active
+                  ? 'bg-[#F56A00] text-white'
+                  : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10'
+              }`}
+            >
+              {opt.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function applyDisplayMode(
+  map: google.maps.Map,
+  mode: MapDisplayMode,
+  size: MapViewSize,
+  isVector: boolean | null,
+) {
+  if (size !== 'full') {
+    map.setMapTypeId('roadmap')
+    map.setTilt(0)
+    map.setHeading(0)
+    return
+  }
+  if (mode === '3d') {
+    if (isVector === false) {
+      map.setMapTypeId('hybrid')
+      map.setTilt(RASTER_3D_TILT)
+      map.setHeading(0)
+    } else {
+      map.setMapTypeId('roadmap')
+      map.setTilt(VECTOR_3D_TILT)
+      map.setHeading(DEFAULT_3D_HEADING)
+    }
+  } else if (mode === 'map') {
+    map.setMapTypeId('roadmap')
+    map.setTilt(0)
+    map.setHeading(0)
+  } else {
+    map.setMapTypeId('hybrid')
+    map.setTilt(0)
+    map.setHeading(0)
+  }
+}
+
+/**
+ * Applies the selected display mode to the map. 3D prefers vector rendering
+ * (roadmap, tilt 55); if the map falls back to raster it uses hybrid + tilt 45
+ * so 45° aerial imagery still gives a 3D feel. Compact maps stay flat.
+ *
+ * Re-applies tilt after programmatic fitBounds (which resets tilt to 0) via an
+ * idle listener — without this the map looks flat even in 3D mode.
+ */
+function MapModeController({ mode, size }: { mode: MapDisplayMode; size: MapViewSize }) {
   const map = useMap()
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [mapType, setMapType] = useState('roadmap')
+  const [isVector, setIsVector] = useState<boolean | null>(null)
 
   useEffect(() => {
-    if (!map) return
-    const current = map.getMapTypeId()
-    if (current) setMapType(current)
+    if (!map || typeof google === 'undefined') return
+    const update = () => {
+      const rt = map.getRenderingType?.()
+      if (rt === 'VECTOR') setIsVector(true)
+      else if (rt === 'RASTER') setIsVector(false)
+    }
+    update()
+    const listener = map.addListener('renderingtype_changed', update)
+    return () => listener.remove()
   }, [map])
 
   useEffect(() => {
-    if (!map || !containerRef.current || typeof google === 'undefined') return
-    const position = google.maps.ControlPosition.TOP_LEFT
-    const controls = map.controls[position]
-    controls.push(containerRef.current)
+    if (!map || typeof google === 'undefined') return
+    cancelCameraMotion(map)
+    applyDisplayMode(map, mode, size, isVector)
+  }, [map, mode, isVector, size])
+
+  // fitBounds / setZoom reset tilt to 0 — restore 3D perspective once the fit settles.
+  useEffect(() => {
+    if (!map || typeof google === 'undefined' || mode !== '3d' || size !== 'full') return
+    const listener = map.addListener('idle', () => {
+      const tilt = map.getTilt() ?? 0
+      if (tilt < 10) applyDisplayMode(map, mode, size, isVector)
+    })
+    return () => listener.remove()
+  }, [map, mode, size, isVector])
+
+  return null
+}
+
+/**
+ * Cinematic camera for 3D mode: glides to the active place (~1s cubic
+ * ease-out via rAF + moveCamera) and slowly orbits (~1°/100ms) once the map
+ * is idle. Orbit stops permanently for the session on any user gesture and
+ * never runs when prefers-reduced-motion is set. Registered in
+ * `cameraInterrupts` so programmatic fits always cancel it first.
+ */
+function CinematicCamera({
+  focus,
+  enabled,
+  glideCenter,
+  resetKey,
+}: {
+  focus: LatLng | null
+  enabled: boolean
+  /** False when MapZoomFocus owns centering — avoids fighting it. */
+  glideCenter: boolean
+  /** Changes when the marker set changes, so the orbit re-arms after refits. */
+  resetKey: string
+}) {
+  const map = useMap()
+  const rafRef = useRef<number | null>(null)
+  const idleRef = useRef<google.maps.MapsEventListener | null>(null)
+
+  // Register the cancel hook for this map so fits can interrupt us.
+  useEffect(() => {
+    if (!map) return
+    const cancel = () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+      idleRef.current?.remove()
+      idleRef.current = null
+    }
+    cameraInterrupts.set(map, cancel)
     return () => {
-      const el = containerRef.current
-      if (!el) return
-      const idx = controls.getArray().indexOf(el)
-      if (idx >= 0) controls.removeAt(idx)
+      cancel()
+      cameraInterrupts.delete(map)
     }
   }, [map])
 
-  return (
-    <div ref={containerRef} className="relative ml-36 mt-3">
-      <select
-        value={mapType}
-        onChange={(e) => {
-          const next = e.target.value
-          setMapType(next)
-          map?.setMapTypeId(next)
-        }}
-        aria-label="Map type"
-        className="cursor-pointer appearance-none rounded-full border border-gray-200 bg-white py-1.5 pl-3 pr-7 text-xs font-medium text-gray-700 shadow-md dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
-      >
-        {MAP_TYPE_OPTIONS.map((opt) => (
-          <option key={opt.id} value={opt.id}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown
-        className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-500"
-        aria-hidden
-      />
-    </div>
-  )
+  // Any user gesture on the map permanently disables auto-orbit this session.
+  useEffect(() => {
+    if (!map || !enabled || typeof google === 'undefined') return
+    const stop = () => {
+      orbitStoppedForSession = true
+      cancelCameraMotion(map)
+    }
+    const div = map.getDiv()
+    const drag = map.addListener('dragstart', stop)
+    div.addEventListener('wheel', stop, { passive: true })
+    div.addEventListener('pointerdown', stop, { passive: true })
+    return () => {
+      drag.remove()
+      div.removeEventListener('wheel', stop)
+      div.removeEventListener('pointerdown', stop)
+    }
+  }, [map, enabled])
+
+  const focusKey =
+    focus && isValidCoord(focus) ? `${focus.lat.toFixed(5)},${focus.lng.toFixed(5)}` : ''
+
+  useEffect(() => {
+    if (!map || !enabled || typeof google === 'undefined') return
+    const reduceMotion = prefersReducedMotion()
+
+    cancelCameraMotion(map)
+
+    const moveCamera = (cam: google.maps.CameraOptions) => {
+      if (typeof map.moveCamera === 'function') {
+        map.moveCamera(cam)
+      } else {
+        if (cam.center) map.setCenter(cam.center)
+        if (cam.tilt != null) map.setTilt(cam.tilt)
+        if (cam.heading != null) map.setHeading(cam.heading)
+      }
+    }
+
+    const startOrbit = () => {
+      if (orbitStoppedForSession || reduceMotion) return
+      // Raster maps snap heading to 90° steps — orbit only on vector.
+      if (map.getRenderingType?.() !== 'VECTOR') return
+      // Wait for PreciseMapFit / MapZoomFocus / route fits to settle first.
+      idleRef.current?.remove()
+      idleRef.current = google.maps.event.addListenerOnce(map, 'idle', () => {
+        let last = performance.now()
+        const step = (now: number) => {
+          if (orbitStoppedForSession) {
+            rafRef.current = null
+            return
+          }
+          const dt = now - last
+          last = now
+          // ~1° per 100ms
+          moveCamera({ heading: ((map.getHeading() ?? 0) + dt * 0.01) % 360 })
+          rafRef.current = requestAnimationFrame(step)
+        }
+        rafRef.current = requestAnimationFrame(step)
+      })
+    }
+
+    const target = focus && isValidCoord(focus) ? focus : null
+
+    if (!target || !glideCenter) {
+      startOrbit()
+      return
+    }
+
+    if (reduceMotion) {
+      // No animation — but the focused place should still be centered.
+      moveCamera({ center: target })
+      return
+    }
+
+    const center = map.getCenter()
+    const from = {
+      lat: center?.lat() ?? target.lat,
+      lng: center?.lng() ?? target.lng,
+      tilt: map.getTilt() ?? 0,
+    }
+    const toTilt = map.getRenderingType?.() === 'RASTER' ? RASTER_3D_TILT : VECTOR_3D_TILT
+    const duration = 1000
+    const start = performance.now()
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / duration)
+      const e = 1 - Math.pow(1 - t, 3) // cubic ease-out
+      moveCamera({
+        center: {
+          lat: from.lat + (target.lat - from.lat) * e,
+          lng: from.lng + (target.lng - from.lng) * e,
+        },
+        tilt: from.tilt + (toTilt - from.tilt) * e,
+      })
+      if (t < 1) {
+        rafRef.current = requestAnimationFrame(step)
+      } else {
+        rafRef.current = null
+        startOrbit()
+      }
+    }
+    rafRef.current = requestAnimationFrame(step)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, enabled, glideCenter, focusKey, resetKey])
+
+  return null
 }
 
 function OriginToPlaceRoute({
@@ -462,6 +708,7 @@ function OriginToPlaceRoute({
         })
         const bounds = result.routes[0]?.bounds
         if (map && bounds) {
+          cancelCameraMotion(map)
           map.fitBounds(bounds, { top: 96, right: 48, bottom: 240, left: 48 })
         }
       }
@@ -544,24 +791,24 @@ function MapPlaceholder({
   if (empty || !place) {
     return (
       <div
-        className={`flex min-h-[200px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 p-6 text-center dark:border-gray-700 dark:bg-gray-900/40 ${className ?? ''}`}
+        className={`flex min-h-[200px] w-full flex-col items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-[0_2px_12px_rgba(0,0,0,0.06)] dark:border-white/10 dark:bg-[#15151a] dark:shadow-[0_2px_12px_rgba(0,0,0,0.5)] ${className ?? ''}`}
         style={{ minHeight: 200, width: '100%', position: 'relative' }}
       >
-        <MapPin className="h-12 w-12 text-[#e07d3a]" strokeWidth={1.5} />
-        <p className="text-[14px] font-medium text-[var(--text-primary)]">Ask me where to go</p>
-        <p className="text-[12px] text-[var(--text-secondary)]">I&apos;ll show places on the map</p>
+        <MapPin className="h-12 w-12 text-[#F56A00]" strokeWidth={1.5} />
+        <p className="text-[14px] font-medium tracking-tight text-gray-900 dark:text-gray-100">Ask me where to go</p>
+        <p className="text-[13px] text-gray-500 dark:text-gray-400">I&apos;ll show places on the map</p>
       </div>
     )
   }
 
   return (
     <div
-      className={`flex min-h-[200px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 p-4 text-center dark:border-gray-700 dark:bg-gray-900/40 ${className ?? ''}`}
+      className={`flex min-h-[200px] w-full flex-col items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white p-4 text-center shadow-[0_2px_12px_rgba(0,0,0,0.06)] dark:border-white/10 dark:bg-[#15151a] dark:shadow-[0_2px_12px_rgba(0,0,0,0.5)] ${className ?? ''}`}
       style={{ minHeight: 200, width: '100%', position: 'relative' }}
     >
-      <MapPin className="h-10 w-10 text-[#e07d3a]" strokeWidth={1.5} />
-      <p className="text-[13px] font-semibold text-[var(--text-primary)]">{place.name}</p>
-      <div className="flex flex-wrap items-center justify-center gap-3 text-[12px] text-[var(--text-secondary)]">
+      <MapPin className="h-10 w-10 text-[#F56A00]" strokeWidth={1.5} />
+      <p className="text-[13px] font-semibold tracking-tight text-gray-900 dark:text-gray-100">{place.name}</p>
+      <div className="flex flex-wrap items-center justify-center gap-3 text-[13px] text-gray-500 dark:text-gray-400">
         {distanceLabel && <span>{distanceLabel}</span>}
         {durationLabel && <span>{durationLabel}</span>}
       </div>
@@ -569,7 +816,7 @@ function MapPlaceholder({
         <button
           type="button"
           onClick={onDirections}
-          className="mt-2 rounded-lg bg-[#e07d3a] px-4 py-2 text-[12px] font-medium text-white hover:bg-[#c96a2e]"
+          className="mt-2 rounded-full bg-[#F56A00] px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[#e05a1a] motion-reduce:transition-none"
         >
           Directions
         </button>
@@ -706,6 +953,21 @@ function MapCanvas({
       ? markers[routeDestIndex]
       : null
 
+  // 3D vector perspective by default in full mode; compact stays flat.
+  const [mapMode, setMapMode] = useState<MapDisplayMode>('3d')
+  const is3D = !isCompact && mapMode === '3d'
+  // Only an explicit active selection triggers the cinematic glide — never
+  // the initial fallback focus, so PreciseMapFit owns the first framing.
+  const activePos =
+    activeStopIndex !== null &&
+    markers[activeStopIndex] &&
+    isValidCoord(markers[activeStopIndex].coordinates)
+      ? markers[activeStopIndex].coordinates
+      : null
+  const cameraResetKey = markerCoords
+    .map((c) => `${c.lat.toFixed(4)},${c.lng.toFixed(4)}`)
+    .join(';')
+
   return (
     <APIProvider
       apiKey={API_KEY}
@@ -715,6 +977,9 @@ function MapCanvas({
       <Map
         defaultCenter={defaultCenter}
         defaultZoom={markerCoords.length > 0 ? (isCompact ? 17 : initialZoom) : DEFAULT_ZOOM}
+        defaultTilt={isCompact ? 0 : VECTOR_3D_TILT}
+        defaultHeading={isCompact ? 0 : DEFAULT_3D_HEADING}
+        renderingType="VECTOR"
         mapId="hodari-map"
         className="h-full w-full"
         style={{ width: '100%', height: '100%', display: 'block' }}
@@ -727,7 +992,7 @@ function MapCanvas({
         styles={MAP_STYLES}
       >
         <MapUiOptions fullControls={size === 'full'} />
-        {size === 'full' && <MapTypeSelectControl />}
+        <MapModeController mode={mapMode} size={size} />
         {markerCoords.length > 0 && <PlacesMapCenter places={markerCoords} />}
         {usePreciseFit && !useFocus && (
           <PreciseMapFit
@@ -739,6 +1004,12 @@ function MapCanvas({
           />
         )}
         <MapZoomFocus position={focusPos ?? null} enabled={useFocus} targetZoom={focusZoom} />
+        <CinematicCamera
+          focus={activePos}
+          enabled={is3D && markerCoords.length > 0}
+          glideCenter={!useFocus}
+          resetKey={cameraResetKey}
+        />
 
         <MapMarkers
           markers={markers}
@@ -783,6 +1054,7 @@ function MapCanvas({
           />
         )}
       </Map>
+      {size === 'full' && <MapModeControl mode={mapMode} onChange={setMapMode} />}
     </APIProvider>
   )
 }
@@ -817,9 +1089,10 @@ export function MapView({
 
   if (loading) {
     return (
-      <div className={`relative ${mapHeight} w-full animate-pulse rounded-xl bg-gray-200 dark:bg-gray-700`}>
+      <div className={`relative ${mapHeight} w-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_2px_12px_rgba(0,0,0,0.06)] dark:border-white/10 dark:bg-[#15151a] dark:shadow-[0_2px_12px_rgba(0,0,0,0.5)]`}>
+        <div className="absolute inset-0 animate-pulse bg-gray-100 motion-reduce:animate-none dark:bg-white/5" />
         <div className="absolute inset-0 flex items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-amber-600" />
+          <Loader2 className="h-6 w-6 animate-spin text-[#F56A00] motion-reduce:animate-none" />
         </div>
       </div>
     )
@@ -827,11 +1100,15 @@ export function MapView({
 
   if (error) {
     return (
-      <div className={`flex ${mapHeight} w-full flex-col items-center justify-center gap-3 rounded-xl border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30`}>
+      <div className={`flex ${mapHeight} w-full flex-col items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-[0_2px_12px_rgba(0,0,0,0.06)] dark:border-white/10 dark:bg-[#15151a] dark:shadow-[0_2px_12px_rgba(0,0,0,0.5)]`}>
         <AlertCircle className="h-6 w-6 text-red-500" />
-        <p className="text-[13px] text-red-700 dark:text-red-400">Map unavailable</p>
+        <p className="text-[13px] font-medium tracking-tight text-gray-900 dark:text-gray-100">Map unavailable</p>
         {onRetry && (
-          <button type="button" onClick={onRetry} className="rounded-full border border-red-300 px-4 py-1.5 text-[13px] text-red-700 hover:bg-red-100">
+          <button
+            type="button"
+            onClick={onRetry}
+            className="rounded-full bg-[#F56A00] px-4 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-[#e05a1a] motion-reduce:transition-none"
+          >
             Retry
           </button>
         )}

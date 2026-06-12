@@ -128,6 +128,8 @@ export function ChatPanel({
   const [historyQuery, setHistoryQuery] = useState('')
   const [caretVisible, setCaretVisible] = useState(false)
   const reduced = useReducedMotion()
+  /** Messages present on first render get a staggered entrance; newly appended ones animate immediately. */
+  const initialCountRef = useRef(messages.length)
 
   const streaming = loading && streamingStarted
   const voiceActive = voiceState !== 'idle'
@@ -199,7 +201,7 @@ export function ChatPanel({
           <button
             type="button"
             onClick={onToggleMapPanel}
-            className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--bg-header)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] shadow-sm transition-colors hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+            className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--bg-header)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[#F56A00]/40 hover:bg-[#F56A00]/[0.06] dark:hover:bg-[#F56A00]/10"
           >
             {mapVisible && !mapExpanded ? (
               <>
@@ -216,7 +218,7 @@ export function ChatPanel({
         </div>
       )}
       {hasLocation && (
-        <p className="mb-2 ml-1 flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-[#e07d3a]">
+        <p className="mb-2 ml-1 flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-[#F56A00] dark:text-[#FF8C2F]">
           <MapPin className="h-3 w-3" />
           Location active
         </p>
@@ -231,8 +233,8 @@ export function ChatPanel({
       )}
       <form onSubmit={handleSubmit}>
         <div
-          className={`flex items-center gap-2 rounded-full border bg-[var(--bg-header)] px-4 py-1 shadow-sm focus-within:border-amber-400 ${
-            voiceActive ? 'border-amber-400/70' : 'border-[var(--border)]'
+          className={`flex items-center gap-2 rounded-full border bg-[var(--bg-header)]/90 px-4 py-1 shadow-[0_2px_12px_rgba(0,0,0,0.06)] backdrop-blur-md transition-[border-color,box-shadow] duration-200 focus-within:border-[#F56A00]/60 focus-within:ring-2 focus-within:ring-[#F56A00]/25 motion-reduce:transition-none dark:shadow-[0_2px_12px_rgba(0,0,0,0.5)] ${
+            voiceActive ? 'border-[#F56A00]/60' : 'border-[var(--border)]'
           }`}
         >
           {voiceSupported && onVoiceToggle && (
@@ -245,7 +247,7 @@ export function ChatPanel({
               className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40 ${
                 voiceState === 'listening'
                   ? 'bg-red-500 text-white'
-                  : 'text-gray-500 hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-900/30'
+                  : 'text-gray-500 hover:bg-[#F56A00]/10 hover:text-[#F56A00] dark:hover:bg-[#F56A00]/15'
               }`}
             >
               <Mic className="h-4 w-4" />
@@ -261,8 +263,8 @@ export function ChatPanel({
               : voiceState === 'paused' ? 'Paused — tap Stop or the mic'
               : 'Time, budget, preferences, location…'
             }
-            className={`min-w-0 flex-1 bg-transparent py-3 text-[13px] text-[var(--text-primary)] outline-none ${
-              voiceActive ? 'placeholder:text-amber-600/80' : 'placeholder:text-[var(--text-secondary)]'
+            className={`min-w-0 flex-1 bg-transparent py-3 text-[14px] text-[var(--text-primary)] outline-none ${
+              voiceActive ? 'placeholder:text-[#F56A00]/80' : 'placeholder:text-[var(--text-secondary)]'
             }`}
             disabled={loading}
           />
@@ -282,7 +284,7 @@ export function ChatPanel({
               type="submit"
               disabled={loading}
               aria-label="Send message"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e07d3a] text-white transition-colors hover:bg-[#c96a2e] disabled:opacity-40"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F56A00] text-white shadow-[0_2px_10px_rgba(245,106,0,0.35)] transition-all duration-150 hover:scale-105 hover:bg-[#e05a1a] active:scale-95 disabled:opacity-40 disabled:hover:scale-100 motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:scale-100"
             >
               <Send className="h-4 w-4" />
             </button>
@@ -296,7 +298,7 @@ export function ChatPanel({
               key={s}
               type="button"
               onClick={() => onSend(s)}
-              className="rounded-full border border-[var(--border)] px-3.5 py-1.5 text-[13px] text-[var(--text-primary)] transition-colors hover:bg-amber-50 dark:hover:bg-amber-900/30"
+              className="rounded-full border border-[var(--border)] px-3.5 py-1.5 text-[13px] text-[var(--text-primary)] transition-colors hover:border-[#F56A00]/40 hover:bg-[#F56A00]/[0.06] dark:hover:bg-[#F56A00]/10"
             >
               {s}
             </button>
@@ -313,37 +315,47 @@ export function ChatPanel({
           <div className="mx-auto w-full max-w-[720px] space-y-5">
             {isEmpty && (
               <div className="flex flex-col items-center px-2 pb-6 pt-[8vh] text-center sm:pt-[10vh]">
-                <p className="font-display text-5xl font-semibold italic text-amber-600/20">Where to?</p>
+                <p className="font-display text-5xl font-semibold italic tracking-tight text-[#F56A00]/25 dark:text-[#FF8C2F]/20">Where to?</p>
                 <p className="mx-auto mt-5 max-w-sm text-[13px] leading-relaxed text-[var(--text-secondary)]">
                   Tell me your time, budget, and preferences, and I&apos;ll build your matchday plan.
                 </p>
               </div>
             )}
 
-            {messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            {messages.map((msg, i) => (
+            <motion.div
+              key={msg.id}
+              initial={reduced ? false : { opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                duration: reduced ? 0 : 0.25,
+                ease: [0.22, 1, 0.36, 1],
+                delay: reduced || i >= initialCountRef.current ? 0 : Math.min(i * 0.05, 0.4),
+              }}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
               {msg.role === 'user' ? (
-                <div className="animate-slide-right max-w-[min(680px,90%)] rounded-2xl rounded-br-[4px] bg-[#e07d3a] px-3.5 py-2.5">
-                  <p className="text-[13px] leading-relaxed text-white">{msg.content}</p>
+                <div className="max-w-[min(680px,90%)] rounded-2xl rounded-br-md bg-gradient-to-br from-[#FF8C2F] to-[#F56A00] px-4 py-2.5 shadow-[0_3px_12px_rgba(245,106,0,0.28)]">
+                  <p className="text-[14px] leading-relaxed text-white">{msg.content}</p>
                 </div>
               ) : (
                 <div className="w-full max-w-[min(680px,100%)] text-left">
-                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-[#e07d3a]">
+                  <p className="mb-1.5 ml-1 text-[11px] font-medium uppercase tracking-wider text-[#F56A00] dark:text-[#FF8C2F]">
                     Hodari
                   </p>
-                  <div className="animate-slide-left w-full py-1 pl-0.5">
-                    {msg.content ? (
+                  {msg.content ? (
+                    <div className="w-full rounded-2xl rounded-tl-md border border-gray-200/80 bg-white px-4 py-3 shadow-[0_2px_12px_rgba(0,0,0,0.05)] dark:border-white/[0.08] dark:bg-[#15151a] dark:shadow-[0_2px_12px_rgba(0,0,0,0.45)]">
                       <CollapsibleMessage
                         content={msg.content}
                         streaming={streaming && msg.id === lastMsgId}
                         showCaret={caretVisible && streaming && msg.id === lastMsgId}
                       />
-                    ) : (
-                      <TypingIndicator />
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <TypingIndicator />
+                  )}
                   {showWriting && msg.id === lastMsgId && (
-                    <p className="animate-fade-up mt-1.5 ml-0.5 text-[11px] text-[var(--text-secondary)]">
+                    <p className="animate-fade-up ml-1 mt-1.5 text-[11px] text-gray-500">
                       Hodari is writing…
                     </p>
                   )}
@@ -356,16 +368,16 @@ export function ChatPanel({
                   ) : null}
                 </div>
               )}
-            </div>
+            </motion.div>
           ))}
 
           {showThinking && (
             <div className="flex justify-start">
               <div className="w-full max-w-[min(680px,100%)]">
-                <p className="mb-1.5 ml-0.5 text-[11px] font-medium uppercase tracking-wider text-[#e07d3a]">
+                <p className="mb-1.5 ml-1 text-[11px] font-medium uppercase tracking-wider text-[#F56A00] dark:text-[#FF8C2F]">
                   Hodari
                 </p>
-                <div className="animate-fade-up py-1">
+                <div className="animate-fade-up">
                   <TypingIndicator />
                 </div>
               </div>
@@ -385,7 +397,7 @@ export function ChatPanel({
               exit={reduced ? undefined : { opacity: 0, y: 8 }}
               transition={{ duration: reduced ? 0 : 0.2 }}
               onClick={() => scrollToBottom(reduced ? 'auto' : 'smooth')}
-              className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-header)]/95 px-4 py-1.5 text-[13px] text-[var(--text-primary)] shadow-lg backdrop-blur-sm hover:border-amber-300"
+              className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-header)]/95 px-4 py-1.5 text-[13px] text-[var(--text-primary)] shadow-[0_8px_24px_rgba(0,0,0,0.12)] backdrop-blur-sm transition-colors hover:border-[#F56A00]/40 dark:shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
             >
               <ChevronDown className="h-4 w-4" />
               New message
@@ -407,7 +419,7 @@ export function ChatPanel({
         onClick={onEnterChatMode}
         aria-pressed={uiMode === 'chat'}
         className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium transition-colors sm:px-3.5 sm:text-[12px] ${
-          uiMode === 'chat' ? 'bg-amber-600 text-white shadow' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+          uiMode === 'chat' ? 'bg-[#F56A00] text-white shadow-[0_2px_8px_rgba(245,106,0,0.35)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
         }`}
       >
         <MessageSquare className="h-3.5 w-3.5" />
@@ -418,7 +430,7 @@ export function ChatPanel({
         onClick={onEnterVoiceMode}
         aria-pressed={uiMode === 'voice'}
         className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium transition-colors sm:px-3.5 sm:text-[12px] ${
-          uiMode === 'voice' ? 'bg-amber-600 text-white shadow' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+          uiMode === 'voice' ? 'bg-[#F56A00] text-white shadow-[0_2px_8px_rgba(245,106,0,0.35)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
         }`}
       >
         <Mic className="h-3.5 w-3.5" />
@@ -444,13 +456,13 @@ export function ChatPanel({
         className={`fixed left-0 top-0 z-50 h-full w-[240px] border-r border-[var(--border)] shadow-2xl transition-transform duration-[220ms] ease ${
           historyOpen ? 'translate-x-0' : '-translate-x-full pointer-events-none'
         }`}
-        style={{ backgroundColor: theme === 'dark' ? '#1A1612' : '#fdf3ee' }}
+        style={{ backgroundColor: theme === 'dark' ? '#15151a' : '#ffffff' }}
       >
         <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
           <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-[var(--text-secondary)] dark:text-gray-200">
             <History className="h-3.5 w-3.5" /> History
           </span>
-          <button type="button" onClick={() => setHistoryOpen(false)} className="text-[var(--text-secondary)] hover:text-amber-600">
+          <button type="button" onClick={() => setHistoryOpen(false)} className="text-[var(--text-secondary)] transition-colors hover:text-[#F56A00]">
             ×
           </button>
         </div>
@@ -460,26 +472,26 @@ export function ChatPanel({
             value={historyQuery}
             onChange={(e) => setHistoryQuery(e.target.value)}
             placeholder="Search chats…"
-            className="mb-3 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-header)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-amber-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+            className="mb-3 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-header)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none transition-[border-color,box-shadow] focus:border-[#F56A00]/60 focus:ring-2 focus:ring-[#F56A00]/20 motion-reduce:transition-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
           />
           <button
             type="button"
             onClick={() => { onNewChat(); setHistoryOpen(false) }}
-            className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-left text-[11px] uppercase tracking-wider text-[var(--text-primary)] hover:border-amber-300 hover:bg-amber-50 dark:border-amber-500 dark:text-amber-400 dark:hover:bg-amber-900/20"
+            className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-left text-[11px] uppercase tracking-wider text-[var(--text-primary)] transition-colors hover:border-[#F56A00]/40 hover:bg-[#F56A00]/[0.06] dark:border-[#F56A00]/50 dark:text-[#FF8C2F] dark:hover:bg-[#F56A00]/10"
           >
             New chat
           </button>
           <a
             href="/saved"
             onClick={() => setHistoryOpen(false)}
-            className="mt-2 flex w-full items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-[11px] uppercase tracking-wider text-[var(--text-primary)] transition-colors hover:border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20"
+            className="mt-2 flex w-full items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-[11px] uppercase tracking-wider text-[var(--text-primary)] transition-colors hover:border-[#F56A00]/40 hover:bg-[#F56A00]/[0.06] dark:text-[#FF8C2F] dark:hover:bg-[#F56A00]/10"
           >
             <Bookmark className="h-3.5 w-3.5 shrink-0" />
             Saved places
           </a>
           {mapArchive.length > 0 && (
             <div className="mt-5 border-t border-[var(--border)] pt-4">
-              <p className="mb-2 flex items-center gap-1.5 px-1 text-[10px] font-medium uppercase tracking-wider text-amber-600">
+              <p className="mb-2 flex items-center gap-1.5 px-1 text-[10px] font-medium uppercase tracking-wider text-[#F56A00] dark:text-[#FF8C2F]">
                 <MapIcon className="h-3 w-3" /> Saved maps (kept on device)
               </p>
               <div className="max-h-40 space-y-1.5 overflow-y-auto">
@@ -488,10 +500,10 @@ export function ChatPanel({
                     key={snap.id}
                     type="button"
                     onClick={() => { onSelectMapArchive?.(snap.id); setHistoryOpen(false) }}
-                    className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-left transition-colors hover:border-amber-300 hover:bg-amber-50/80 dark:hover:bg-amber-900/20"
+                    className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-left transition-colors hover:border-[#F56A00]/40 hover:bg-[#F56A00]/[0.06] dark:hover:bg-[#F56A00]/10"
                   >
                     <p className="truncate text-[12px] font-medium text-[var(--text-primary)]">{snap.title}</p>
-                    <p className="text-[10px] text-[var(--text-secondary)]">
+                    <p className="text-[10px] text-gray-500">
                       {new Date(snap.savedAt).toLocaleDateString()}
                     </p>
                   </button>
@@ -508,10 +520,10 @@ export function ChatPanel({
                   <button
                     type="button"
                     onClick={() => { onSelectHistory(item.id); setHistoryOpen(false) }}
-                    className="w-full rounded-lg px-2 py-2 pr-8 text-left hover:bg-amber-50 dark:text-gray-300 dark:hover:bg-amber-900/10"
+                    className="w-full rounded-lg px-2 py-2 pr-8 text-left transition-colors hover:bg-[#F56A00]/[0.06] dark:text-gray-300 dark:hover:bg-[#F56A00]/10"
                   >
                     <span className="block truncate text-[13px] text-[var(--text-primary)] dark:text-gray-300">{item.title}</span>
-                    <span className="mt-0.5 block text-[11px] text-[var(--text-secondary)] dark:text-gray-500">
+                    <span className="mt-0.5 block text-[11px] text-gray-500">
                       {new Date(item.updatedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </button>
@@ -539,7 +551,7 @@ export function ChatPanel({
       >
         <div
           className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 bg-transparent px-4 pb-3 pt-3.5 sm:px-5"
-          style={{ backgroundColor: theme === 'dark' ? 'rgba(26, 22, 18, 0.35)' : 'rgba(255, 255, 255, 0.3)' }}
+          style={{ backgroundColor: theme === 'dark' ? 'rgba(21, 21, 26, 0.35)' : 'rgba(255, 255, 255, 0.3)' }}
         >
           <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
             <div className="min-w-0">
@@ -555,7 +567,7 @@ export function ChatPanel({
                 onClick={onToggleSpeakReplies}
                 aria-label={speakReplies ? 'Mute spoken replies' : 'Speak replies aloud'}
                 title={speakReplies ? 'Mute spoken replies' : 'Speak replies aloud'}
-                className={`rounded-lg border p-1.5 transition-colors ${speakReplies ? 'border-amber-400/60 text-amber-600' : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-amber-300 hover:text-amber-600'}`}
+                className={`rounded-lg border p-1.5 transition-colors ${speakReplies ? 'border-[#F56A00]/50 text-[#F56A00]' : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00]'}`}
               >
                 {speakReplies ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
               </button>
@@ -564,7 +576,7 @@ export function ChatPanel({
               type="button"
               onClick={onToggleTheme}
               aria-label="Toggle theme"
-              className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] hover:border-amber-300 hover:text-amber-600"
+              className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00]"
             >
               {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
@@ -572,7 +584,7 @@ export function ChatPanel({
               type="button"
               aria-label="Open chat history"
               onClick={() => setHistoryOpen((open) => !open)}
-              className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] hover:border-amber-300 hover:text-amber-600"
+              className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00]"
             >
               <Menu className="h-4 w-4" />
             </button>
@@ -584,7 +596,7 @@ export function ChatPanel({
                   else if (mapVisible) onExpandMap()
                   else onOpenMapPanel()
                 }}
-                className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-1.5 text-[11px] uppercase tracking-wider text-[var(--text-secondary)] hover:border-amber-300"
+                className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-1.5 text-[11px] uppercase tracking-wider text-[var(--text-secondary)] transition-colors hover:border-[#F56A00]/40 hover:text-[#F56A00]"
               >
                 <MapIcon className="h-3.5 w-3.5" />
                 {mapExpanded ? 'Compact map' : mapVisible ? 'Full map' : 'Open map'}
@@ -598,7 +610,7 @@ export function ChatPanel({
             )}
           </div>
         </div>
-        <div className="h-px shrink-0 bg-gradient-to-r from-transparent via-amber-200/40 to-transparent dark:via-amber-800/30" />
+        <div className="h-px shrink-0 bg-gradient-to-r from-transparent via-[#F56A00]/20 to-transparent dark:via-[#FF8C2F]/15" />
 
         <div className="relative grid min-h-0 flex-1 grid-rows-[1fr_auto] overflow-hidden">
           {messageList}

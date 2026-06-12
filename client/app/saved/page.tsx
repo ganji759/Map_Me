@@ -89,14 +89,14 @@ export default function SavedPage() {
   const hasCalendar = Object.keys(calendarGroups).length > 0
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#fdf3ee] dark:bg-[#1A1612]">
+    <div className="flex min-h-screen flex-col bg-[#ffffff] dark:bg-[#15151a]">
       {/* Header */}
-      <header className="flex items-center gap-4 border-b border-amber-100/60 bg-[#fdf3ee]/95 px-5 py-4 backdrop-blur-sm dark:border-amber-900/30 dark:bg-[#1A1612]/95">
+      <header className="flex items-center gap-4 border-b border-amber-100/60 bg-[#ffffff]/95 px-5 py-4 backdrop-blur-sm dark:border-amber-900/30 dark:bg-[#15151a]/95">
         <Link href="/" className="flex items-center gap-2 rounded-lg p-1.5 text-amber-700 transition-colors hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/30">
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <div>
-          <h1 className="font-display text-xl font-semibold text-[#1A1612] dark:text-amber-50">Saved Places</h1>
+          <h1 className="font-display text-xl font-semibold text-[#15151a] dark:text-amber-50">Saved Places</h1>
           <p className="text-[11px] uppercase tracking-wider text-amber-700/70 dark:text-amber-500/70">FIFA World Cup 2026 · Your list</p>
         </div>
         <div className="ml-auto flex items-center gap-2">
@@ -155,7 +155,7 @@ export default function SavedPage() {
                   const isEditing = editingReminder === item.place_id
                   const inp = reminderInputs[item.place_id] ?? { date: reminder?.visit_date ?? '', note: reminder?.note ?? '' }
                   return (
-                    <div key={item.place_id} className="overflow-hidden rounded-2xl border border-amber-100/80 bg-white/70 shadow-sm dark:border-amber-900/30 dark:bg-[#221c17]/70">
+                    <div key={item.place_id} className="overflow-hidden rounded-2xl border border-amber-100/80 bg-white/70 shadow-sm dark:border-amber-900/30 dark:bg-[#15151a]/70">
                       <div className="flex gap-4 p-4">
                         {/* Photo */}
                         <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-amber-100 dark:bg-amber-900/20">
@@ -170,7 +170,7 @@ export default function SavedPage() {
 
                         {/* Info */}
                         <div className="min-w-0 flex-1">
-                          <p className="truncate font-semibold text-[15px] text-[#1A1612] dark:text-amber-50">{item.place_name}</p>
+                          <p className="truncate font-semibold text-[15px] text-[#15151a] dark:text-amber-50">{item.place_name}</p>
                           {item.city && <p className="mt-0.5 text-[12px] text-amber-700/70 dark:text-amber-500/70">{item.city}</p>}
                           {d?.rating != null && (
                             <p className="mt-1 text-[11px] text-amber-600">★ {d.rating.toFixed(1)}</p>
@@ -215,7 +215,7 @@ export default function SavedPage() {
                                 value={inp.date}
                                 min={new Date().toISOString().slice(0, 10)}
                                 onChange={(e) => setReminderInputs((p) => ({ ...p, [item.place_id]: { ...inp, date: e.target.value } }))}
-                                className="w-full rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-[13px] text-[#1A1612] outline-none focus:border-amber-400 dark:border-amber-800 dark:bg-[#1A1612] dark:text-amber-50"
+                                className="w-full rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-[13px] text-[#15151a] outline-none focus:border-amber-400 dark:border-amber-800 dark:bg-[#15151a] dark:text-amber-50"
                               />
                             </div>
                             <div className="flex-1 min-w-[150px]">
@@ -225,7 +225,7 @@ export default function SavedPage() {
                                 value={inp.note}
                                 placeholder="e.g. lunch before the match"
                                 onChange={(e) => setReminderInputs((p) => ({ ...p, [item.place_id]: { ...inp, note: e.target.value } }))}
-                                className="w-full rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-[13px] text-[#1A1612] outline-none placeholder:text-amber-300 focus:border-amber-400 dark:border-amber-800 dark:bg-[#1A1612] dark:text-amber-50"
+                                className="w-full rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-[13px] text-[#15151a] outline-none placeholder:text-amber-300 focus:border-amber-400 dark:border-amber-800 dark:bg-[#15151a] dark:text-amber-50"
                               />
                             </div>
                             <button
@@ -273,7 +273,7 @@ export default function SavedPage() {
                             const d = details[item.place_id]
                             const dt = new Date(item.visit_date!)
                             return (
-                              <div key={item.place_id} className="flex items-center gap-4 rounded-2xl border border-amber-100/80 bg-white/70 p-4 shadow-sm dark:border-amber-900/30 dark:bg-[#221c17]/70">
+                              <div key={item.place_id} className="flex items-center gap-4 rounded-2xl border border-amber-100/80 bg-white/70 p-4 shadow-sm dark:border-amber-900/30 dark:bg-[#15151a]/70">
                                 {/* Date badge */}
                                 <div className="flex h-14 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-amber-600 text-white">
                                   <span className="text-[10px] font-medium uppercase">{dt.toLocaleDateString('en-US', { month: 'short' })}</span>
@@ -293,7 +293,7 @@ export default function SavedPage() {
 
                                 {/* Details */}
                                 <div className="min-w-0 flex-1">
-                                  <p className="truncate font-medium text-[14px] text-[#1A1612] dark:text-amber-50">{item.place_name}</p>
+                                  <p className="truncate font-medium text-[14px] text-[#15151a] dark:text-amber-50">{item.place_name}</p>
                                   <p className="text-[11px] text-amber-700/70 dark:text-amber-500/70">
                                     {dt.toLocaleDateString('en-US', { weekday: 'long' })}
                                     {item.city ? ` · ${item.city}` : ''}

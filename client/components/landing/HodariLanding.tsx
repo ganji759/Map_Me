@@ -7,13 +7,15 @@ import {
   EASE,
   HodariLogo,
   LiveClock,
+  Reveal,
   RollText,
   StarburstMark,
   ThemeToggle,
   useLandingTheme,
 } from '@/components/landing/bits'
 
-import HeroShowcase from '@/components/landing/HeroShowcase'
+import HeroMap from '@/components/landing/HeroMap'
+import ShowcaseMarquee from '@/components/landing/ShowcaseMarquee'
 
 const NAV_LINKS = [
   { label: 'How it works', href: '#about' },
@@ -58,33 +60,6 @@ function SectionBadge({ number, label, borderClass = 'border-gray-200 dark:borde
   )
 }
 
-/** Card 1 hover affordance: white circle expanding into a "Learn more" pill. */
-function ExpandingLightButton() {
-  return (
-    <span className="absolute bottom-4 left-4 flex h-9 w-9 items-center gap-2 overflow-hidden rounded-full bg-white pl-[11px] transition-all duration-300 ease-in-out group-hover:w-[148px]">
-      <svg viewBox="0 0 24 24" className={`h-[14px] w-[14px] shrink-0 fill-none stroke-gray-900 transition-transform duration-300 ease-in-out -rotate-45 group-hover:rotate-0`} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-      </svg>
-      <span className="whitespace-nowrap text-[13px] font-medium text-gray-900 opacity-0 transition-opacity duration-300 delay-100 group-hover:opacity-100">
-        Learn more
-      </span>
-    </span>
-  )
-}
-
-/** Card 2 hover affordance: dark circle expanding into "Plan with Hodari". */
-function ExpandingDarkButton() {
-  return (
-    <span className="absolute bottom-4 left-4 flex h-9 w-9 items-center gap-2 overflow-hidden rounded-full bg-gray-900 pl-[11px] transition-all duration-300 ease-in-out group-hover:w-[172px]">
-      <ArrowRight size={14} className="shrink-0 text-white transition-transform duration-300 ease-in-out -rotate-45 group-hover:rotate-0" />
-      <span className="whitespace-nowrap text-[13px] font-medium text-white opacity-0 transition-opacity duration-300 delay-100 group-hover:opacity-100">
-        Plan with Hodari
-      </span>
-    </span>
-  )
-}
-
 export default function HodariLanding() {
   const { dark, toggle } = useLandingTheme()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -112,8 +87,8 @@ export default function HodariLanding() {
 
       {/* ── SECTION 1 · HERO ─────────────────────────────────────────────── */}
       <section id="top" className="relative flex min-h-screen flex-col overflow-hidden bg-[#EFEFEF] dark:bg-[#0a0a0d]">
-        {/* Cinematic rotator on the right — globe ↔ fan photos — text owns the left */}
-        <HeroShowcase className="absolute right-[-35%] top-[10%] w-[min(88vw,440px)] sm:right-[-12%] sm:top-1/2 sm:-translate-y-[58%] sm:w-[min(70vh,620px)] lg:right-[1%] lg:w-[min(78vh,700px)] xl:right-[4%]" />
+        {/* Cinematic night-map panorama on the right — text owns the left */}
+        <HeroMap className="absolute right-[-32%] top-[4%] w-[min(92vw,440px)] sm:right-[-6%] sm:top-1/2 sm:-translate-y-[54%] sm:w-[min(58vh,560px)] lg:right-[2%] lg:w-[min(64vh,620px)] xl:right-[5%]" />
         {/* Readability veil under the headline */}
         <div className="absolute inset-x-0 bottom-0 h-[36%] bg-gradient-to-b from-transparent to-[#EFEFEF]/95 dark:to-[#0a0a0d]/95" />
 
@@ -174,14 +149,19 @@ export default function HodariLanding() {
 
         {/* Hero content — pinned to the bottom of the viewport */}
         <div className="relative z-20 mx-auto w-full max-w-[1440px] px-5 pb-14 sm:px-8 sm:pb-16 lg:px-12 lg:pb-20">
-          <p className="mb-5 text-[13px] tracking-wide text-gray-900 dark:text-gray-200 sm:mb-8 sm:text-[14px]">
-            Hodari, your AI companion for World Cup days
+          <p className="mb-5 animate-[fadeUp_0.7s_0.05s_both] motion-reduce:animate-none text-[13px] tracking-wide text-gray-900 dark:text-gray-200 sm:mb-7 sm:text-[14px]">
+            Hodari, your AI companion for the 2026 FIFA World Cup
           </p>
-          <h1 className="max-w-[15ch] font-display font-semibold leading-[1.08] tracking-[-0.02em] text-gray-900 dark:text-gray-50 text-[clamp(1.75rem,7vw,4.2rem)] sm:text-[clamp(2.5rem,5vw,4.2rem)]">
-            Find a great place to eat fast, in a city you&apos;ve never set&nbsp;foot&nbsp;in.
+          <h1 className="max-w-[20ch] animate-[fadeUp_0.8s_0.18s_both] motion-reduce:animate-none font-display font-semibold leading-[1.08] tracking-[-0.02em] text-gray-900 dark:text-gray-50 text-[clamp(1.7rem,6.4vw,3.9rem)] sm:text-[clamp(2.3rem,4.6vw,3.9rem)]">
+            Find the best restaurants and hotels for your World Cup journey — and&nbsp;beyond.
           </h1>
+          <p className="mt-5 max-w-[52ch] animate-[fadeUp_0.8s_0.32s_both] motion-reduce:animate-none text-[14px] leading-relaxed text-gray-600 dark:text-gray-300 sm:mt-6 sm:text-[16px]">
+            Never feel lost in a new city. Hodari understands exactly where you
+            are, guides you with confidence, and helps you make the most of
+            every day — during the tournament and long after.
+          </p>
 
-          <div className="mt-8 flex flex-col gap-4 sm:mt-12 sm:flex-row sm:items-center sm:gap-5">
+          <div className="mt-8 flex animate-[fadeUp_0.8s_0.46s_both] motion-reduce:animate-none flex-col gap-4 sm:mt-10 sm:flex-row sm:items-center sm:gap-5">
             <OrangeCta href={ctaHref} label="Start exploring" />
 
             <span className="flex w-fit items-center gap-2.5 rounded-[4px] bg-white px-3 py-2 shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-shadow duration-300 hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] dark:bg-[#15151a] dark:shadow-[0_2px_8px_rgba(0,0,0,0.45)]">
@@ -240,106 +220,94 @@ export default function HodariLanding() {
         <div className="mx-auto max-w-[1440px]">
           <SectionBadge number="1" label="Introducing Hodari" />
 
-          <h2 className="mb-12 px-5 font-display font-semibold leading-[1.12] tracking-[-0.01em] text-gray-900 dark:text-gray-50 text-[clamp(1.5rem,4vw,3.2rem)] sm:mb-16 sm:px-8 lg:mb-28 lg:px-12">
-            “Four hours, $60, vegetarian near<br className="hidden sm:block" />
-            <span className="sm:hidden"> </span>
-            the stadium.” That&apos;s all Hodari needs.
-          </h2>
+          <Reveal>
+            <h2 className="mb-12 px-5 font-display font-semibold leading-[1.12] tracking-[-0.01em] text-gray-900 dark:text-gray-50 text-[clamp(1.5rem,4vw,3.2rem)] sm:mb-16 sm:px-8 lg:mb-28 lg:px-12">
+              “Four hours, $60, vegetarian near<br className="hidden sm:block" />
+              <span className="sm:hidden"> </span>
+              the stadium.” That&apos;s all Hodari needs.
+            </h2>
+          </Reveal>
 
           {/* Mobile / tablet */}
           <div className="px-5 sm:px-8 lg:hidden">
             <p className="text-[15px] font-medium leading-[1.6] text-gray-900 dark:text-gray-200 sm:text-[17px]">
-              Real restaurants from Google Maps, never invented, ranked to your
-              taste and ordered into a route you can actually walk. Where to eat,
-              what to see, how to get there.
+              Real restaurants and hotels from Google Maps, never invented,
+              ranked to your taste and ordered into a route you can actually
+              walk. Where to eat, where to stay, how to get there.
             </p>
             <div className="mt-6">
               <OrangeCta href={ctaHref} label="Plan my first meal" />
             </div>
             <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:gap-5">
-              <img
-                src="/landing/globe.png"
-                alt="Host-city lights across North America at night"
-                className="aspect-[438/346] w-full rounded-xl object-cover object-[center_30%] dark:brightness-[0.5] dark:contrast-[1.15] dark:saturate-[1.3] sm:w-[45%] sm:rounded-2xl"
-              />
-              <img
-                src="/landing/globe.png"
-                alt="The 2026 World Cup host continent from orbit"
-                className="aspect-[900/600] w-full rounded-xl object-cover object-[center_55%] dark:brightness-[0.5] dark:contrast-[1.15] dark:saturate-[1.3] sm:w-[55%] sm:rounded-2xl"
-              />
+              <Reveal className="sm:w-[45%]">
+                <img
+                  src="/landing/worldcup-draw.jpg"
+                  alt="The FIFA World Cup trophy beneath a canopy of national flags"
+                  className="aspect-[438/346] w-full rounded-xl object-cover object-[center_62%] sm:rounded-2xl"
+                />
+              </Reveal>
+              <Reveal delay={120} className="sm:w-[55%]">
+                <img
+                  src="/landing/metlife-stadium.jpg"
+                  alt="MetLife Stadium glowing at night with the New York skyline behind it"
+                  className="aspect-[900/600] w-full rounded-xl object-cover object-[center_55%] sm:rounded-2xl"
+                />
+              </Reveal>
             </div>
           </div>
 
           {/* Desktop */}
           <div className="hidden grid-cols-[26%_1fr_48%] items-end gap-6 px-12 lg:grid xl:gap-8">
-            <img
-              src="/landing/globe.png"
-              alt="Host-city lights across North America at night"
-              className="aspect-[438/346] w-full self-end rounded-2xl object-cover object-[center_30%] dark:brightness-[0.5] dark:contrast-[1.15] dark:saturate-[1.3]"
-            />
+            <Reveal className="self-end">
+              <img
+                src="/landing/worldcup-draw.jpg"
+                alt="The FIFA World Cup trophy beneath a canopy of national flags"
+                className="aspect-[438/346] w-full rounded-2xl object-cover object-[center_62%]"
+              />
+            </Reveal>
             <div className="flex flex-col items-start gap-8 self-start lg:items-end">
               <p className="whitespace-nowrap text-[16px] font-medium leading-[1.65] text-gray-900 dark:text-gray-200 xl:text-[18px]">
-                Real restaurants from Google Maps,<br />
-                ranked to your taste and ordered into<br />
-                a route you can actually walk.
+                Real restaurants and hotels from<br />
+                Google Maps, ranked to your taste and<br />
+                ordered into a route you can walk.
               </p>
               <OrangeCta href={ctaHref} label="Plan my first meal" />
             </div>
-            <img
-              src="/landing/globe.png"
-              alt="The 2026 World Cup host continent from orbit"
-              className="aspect-[3/2] w-full self-end rounded-2xl object-cover object-[center_55%] dark:brightness-[0.5] dark:contrast-[1.15] dark:saturate-[1.3]"
-            />
+            <Reveal delay={140} className="self-end">
+              <img
+                src="/landing/metlife-stadium.jpg"
+                alt="MetLife Stadium glowing at night with the New York skyline behind it"
+                className="aspect-[3/2] w-full rounded-2xl object-cover object-[center_58%]"
+              />
+            </Reveal>
           </div>
         </div>
       </section>
 
-      {/* ── SECTION 3 · FEATURED ─────────────────────────────────────────── */}
-      <section id="work" className="bg-[#F5F5F5] pb-16 pt-16 dark:bg-[#0b0b0f] sm:pb-20 sm:pt-20 lg:pb-28 lg:pt-28">
+      {/* ── SECTION 3 · SHOWCASE ─────────────────────────────────────────── */}
+      <section id="work" className="overflow-hidden bg-[#F5F5F5] pb-16 pt-16 dark:bg-[#0b0b0f] sm:pb-20 sm:pt-20 lg:pb-28 lg:pt-28">
         <div className="mx-auto max-w-[1440px]">
           <SectionBadge number="2" label="What fans do with Hodari" borderClass="border-gray-300 dark:border-white/15" />
 
-          <h2 className="mb-10 px-5 font-display font-semibold leading-[1.08] tracking-[-0.01em] text-gray-900 dark:text-gray-50 text-[clamp(1.75rem,7vw,4.2rem)] sm:mb-14 sm:px-8 sm:text-[clamp(2.5rem,5vw,4.2rem)] lg:mb-16 lg:px-12">
-            From match to meal
-          </h2>
+          <Reveal>
+            <h2 className="mb-4 px-5 font-display font-semibold leading-[1.08] tracking-[-0.01em] text-gray-900 dark:text-gray-50 text-[clamp(1.75rem,7vw,4.2rem)] sm:px-8 sm:text-[clamp(2.5rem,5vw,4.2rem)] lg:px-12">
+              From the trophy to the table
+            </h2>
+            <p className="mb-10 max-w-[58ch] px-5 text-[14px] leading-relaxed text-gray-600 dark:text-gray-400 sm:mb-12 sm:px-8 sm:text-[16px] lg:px-12">
+              The match is ninety minutes. The rest of the day is yours — Hodari
+              fills it with the right stadium route, the right table, and the
+              right people.
+            </p>
+          </Reveal>
+        </div>
 
-          <div className="grid grid-cols-1 gap-5 px-5 sm:gap-6 sm:px-8 md:grid-cols-2 lg:gap-7 lg:px-12">
-            <Link href={ctaHref} className="block">
-              <div className="group relative aspect-[329/246] cursor-pointer overflow-hidden rounded-2xl bg-[#1a1d2e]">
-                <img
-                  src="/landing/worldcup-fans.png"
-                  alt="Fans in national team jerseys hanging out together before a match"
-                  className="h-full w-full object-cover object-[center_30%] transition-transform duration-700 ease-out group-hover:scale-105"
-                />
-                <ExpandingLightButton />
-              </div>
-              <p className="mt-4 text-[13px] leading-relaxed text-gray-600 dark:text-gray-400 sm:text-[14px]">
-                Meet your crew in their colours, then walk to a table that fits
-                everyone&apos;s budget and diet.
-              </p>
-              <p className="mt-1 text-[14px] font-semibold text-gray-900 dark:text-gray-100 sm:text-[15px]">
-                Match day in New York
-              </p>
-            </Link>
+        {/* Full-bleed sliding showcase — hover to pause */}
+        <Reveal delay={100}>
+          <ShowcaseMarquee />
+        </Reveal>
 
-            <Link href={ctaHref} className="block">
-              <div className="group relative aspect-square cursor-pointer overflow-hidden rounded-2xl bg-[#1a1610]">
-                <img
-                  src="/landing/restaurant.jpg"
-                  alt="Warm gold-and-black restaurant interior set for dinner"
-                  className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-                />
-                <ExpandingDarkButton />
-              </div>
-              <p className="mt-4 text-[13px] leading-relaxed text-gray-600 dark:text-gray-400 sm:text-[14px]">
-                After the final whistle, Hodari routes you and your friends to the
-                city&apos;s best tables and gets you back safe.
-              </p>
-              <p className="mt-1 text-[14px] font-semibold text-gray-900 dark:text-gray-100 sm:text-[15px]">
-                Dinner after dark in Mexico City
-              </p>
-            </Link>
-          </div>
+        <div className="mx-auto mt-10 max-w-[1440px] px-5 sm:mt-12 sm:px-8 lg:px-12">
+          <OrangeCta href={ctaHref} label="Plan my World Cup days" />
         </div>
       </section>
 

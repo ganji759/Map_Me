@@ -189,6 +189,25 @@ export default function LandingPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placeIdsKey])
 
+  // Warm the browser cache for every place photo as soon as its URL is known,
+  // so cards and detail panels render their image instantly instead of
+  // downloading on first view.
+  const preloadedPhotoSrcsRef = useRef(new Set<string>())
+  useEffect(() => {
+    for (const p of places) {
+      const refSrc = p.photo_reference
+        ? `/api/place-photo?ref=${encodeURIComponent(p.photo_reference)}`
+        : null
+      const srcs = [p.photo_url, ...(p.photos ?? []), refSrc].filter(Boolean).slice(0, 3) as string[]
+      for (const src of srcs) {
+        if (preloadedPhotoSrcsRef.current.has(src)) continue
+        preloadedPhotoSrcsRef.current.add(src)
+        const img = new Image()
+        img.src = src
+      }
+    }
+  }, [places])
+
   const handleSavePlace = useCallback(
     (place: Place) => {
       const id = place.place_id

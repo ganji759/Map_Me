@@ -211,7 +211,7 @@ export function PlaceDetailsPanel({
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       <div className="relative flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-header)] shadow-2xl">
-        <div className="relative h-44 shrink-0 overflow-hidden bg-gradient-to-br from-amber-50 to-[#fdf3ee] dark:from-amber-950/40 dark:to-slate-900">
+        <div className="relative h-44 shrink-0 overflow-hidden bg-gradient-to-br from-amber-50 to-[#ffffff] dark:from-amber-950/40 dark:to-slate-900">
           {data?.photoUrls?.length ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img

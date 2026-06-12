@@ -7,9 +7,13 @@ interface Props {
   className?: string
   width?: number
   height?: number
+  /** Place photos download immediately by default so cards render instantly;
+      pass 'lazy' only for long off-screen lists (e.g. saved-places grid). */
+  loading?: 'eager' | 'lazy'
+  onLoad?: () => void
 }
 
-export function PlaceImage({ place, className, width, height }: Props) {
+export function PlaceImage({ place, className, width, height, loading = 'eager', onLoad }: Props) {
   const src =
     place.photo_url ??
     place.photos?.[0] ??
@@ -37,10 +41,14 @@ export function PlaceImage({ place, className, width, height }: Props) {
       className={className}
       width={width}
       height={height}
-      loading="lazy"
+      loading={loading}
+      fetchPriority={loading === 'eager' ? 'high' : 'auto'}
+      decoding="async"
+      onLoad={onLoad}
       onError={(e) => {
         const el = e.currentTarget
         el.style.display = 'none'
+        onLoad?.()
       }}
     />
   )
