@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { APIProvider, Map, AdvancedMarker, Pin, useMap } from '@vis.gl/react-google-maps'
-import { AlertCircle, ChevronLeft, Loader2, MapPin, Maximize2, Minimize2, Star } from 'lucide-react'
+import { AlertCircle, ChevronLeft, Compass, Loader2, MapPin, Maximize2, Minimize2, RotateCcw, RotateCw, Star } from 'lucide-react'
 import type { ItineraryStop, Place, Theme } from '@/lib/types'
 import type { CustomRouteConfig, TravelMode } from '@/lib/mapActions'
 import {
@@ -349,6 +349,11 @@ function MapUiOptions({ fullControls }: { fullControls: boolean }) {
         streetViewControl: true,
         fullscreenControl: true,
         mapTypeControl: false,
+        // Custom rotate cluster replaces the native compass widget; vector
+        // maps then rotate/tilt freely via Ctrl+drag (two fingers on touch).
+        rotateControl: false,
+        headingInteractionEnabled: true,
+        tiltInteractionEnabled: true,
       })
     } else {
       map.setOptions({
@@ -356,6 +361,9 @@ function MapUiOptions({ fullControls }: { fullControls: boolean }) {
         streetViewControl: false,
         fullscreenControl: false,
         mapTypeControl: false,
+        rotateControl: false,
+        headingInteractionEnabled: false,
+        tiltInteractionEnabled: false,
       })
     }
   }, [map, fullControls])
@@ -396,6 +404,75 @@ function MapModeControl({
             </button>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Right-edge rotate cluster for the 3D vector map: 45° steps left/right
+ * (smoothly tweened) and a compass reset back to north. Manual rotation is a
+ * camera takeover, so it permanently stops the ambient orbit like any other
+ * user gesture. Hidden in satellite mode — raster imagery snaps heading to
+ * 90° steps and free rotation reads as broken there.
+ */
+function MapRotateControls() {
+  const map = useMap()
+  const rafRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
+    }
+  }, [])
+
+  const rotateTo = (target: number, from: number) => {
+    if (!map) return
+    if (prefersReducedMotion()) {
+      map.setHeading(((target % 360) + 360) % 360)
+      return
+    }
+    const duration = 350
+    const start = performance.now()
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / duration)
+      const e = 1 - Math.pow(1 - t, 3) // cubic ease-out
+      map.setHeading(from + (target - from) * e)
+      rafRef.current = t < 1 ? requestAnimationFrame(step) : null
+    }
+    rafRef.current = requestAnimationFrame(step)
+  }
+
+  const handleRotate = (delta: number | 'north') => {
+    if (!map) return
+    orbitStoppedForSession = true
+    cancelCameraMotion(map)
+    if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
+    const from = map.getHeading() ?? 0
+    // Reset spins through the shorter arc back to north.
+    const target = delta === 'north' ? (((from % 360) + 360) % 360 > 180 ? Math.ceil(from / 360) * 360 : Math.floor(from / 360) * 360) : from + delta
+    rotateTo(target, from)
+  }
+
+  const buttonClass =
+    'flex h-9 w-9 items-center justify-center rounded-full text-gray-700 transition-colors hover:bg-gray-100 motion-reduce:transition-none dark:text-gray-200 dark:hover:bg-white/10'
+
+  return (
+    <div className="pointer-events-none absolute right-4 top-1/2 z-[58] -translate-y-1/2">
+      <div
+        role="group"
+        aria-label="Rotate map"
+        className="pointer-events-auto flex flex-col items-center gap-0.5 rounded-full border border-gray-200 bg-white/95 p-1 shadow-[0_2px_12px_rgba(0,0,0,0.06)] backdrop-blur dark:border-white/10 dark:bg-[#15151a]/95 dark:shadow-[0_2px_12px_rgba(0,0,0,0.5)]"
+      >
+        <button type="button" aria-label="Rotate left" title="Rotate left 45°" onClick={() => handleRotate(-45)} className={buttonClass}>
+          <RotateCcw className="h-4 w-4" />
+        </button>
+        <button type="button" aria-label="Face north" title="Reset to north" onClick={() => handleRotate('north')} className={buttonClass}>
+          <Compass className="h-4 w-4" />
+        </button>
+        <button type="button" aria-label="Rotate right" title="Rotate right 45°" onClick={() => handleRotate(45)} className={buttonClass}>
+          <RotateCw className="h-4 w-4" />
+        </button>
       </div>
     </div>
   )
@@ -1055,6 +1132,7 @@ function MapCanvas({
         )}
       </Map>
       {size === 'full' && <MapModeControl mode={mapMode} onChange={setMapMode} />}
+      {size === 'full' && mapMode !== 'satellite' && <MapRotateControls />}
     </APIProvider>
   )
 }
