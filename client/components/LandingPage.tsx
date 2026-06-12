@@ -165,9 +165,27 @@ export default function LandingPage() {
   useEffect(() => { activeStopRef.current = activeStop }, [activeStop])
   useEffect(() => { speakRepliesRef.current = speakReplies }, [speakReplies])
 
-  // Auto-fetch photos for places that came back without one
-  const placeIdsKey = places.map((p) => p.place_id).join(',')
+  // Auto-fetch photos for places that came back without one. The stream
+  // handler re-sets `places` with fresh photo-less objects several times per
+  // turn (candidates chunk, final state, open-map-from-message), so fetched
+  // URLs are kept in a cache keyed by place_id and re-applied after every
+  // overwrite — the key below flips whenever a visible place loses its photo.
+  const photoCacheRef = useRef(new Map<string, string[]>())
+  const placePhotoKey = places
+    .map((p) => `${p.place_id}:${p.photo_url || p.photos?.length ? 1 : 0}`)
+    .join(',')
   useEffect(() => {
+    const applyCached = (list: Place[]) =>
+      list.map((p) => {
+        if (p.photo_url || p.photos?.length) return p
+        const urls = photoCacheRef.current.get(p.place_id)
+        return urls?.length ? { ...p, photo_url: urls[0], photos: urls } : p
+      })
+
+    if (places.some((p) => !p.photo_url && !p.photos?.length && photoCacheRef.current.has(p.place_id))) {
+      setPlaces((prev) => applyCached(prev))
+    }
+
     const toFetch = places.filter(
       (p) => p.place_id && !p.place_id.startsWith('__') && !p.photo_url && !p.photos?.length && !fetchedPhotoIdsRef.current.has(p.place_id),
     )
@@ -178,6 +196,7 @@ export default function LandingPage() {
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
           if (!data?.photoUrls?.length) return
+          photoCacheRef.current.set(place.place_id, data.photoUrls)
           setPlaces((prev) =>
             prev.map((p) =>
               p.place_id === place.place_id ? { ...p, photo_url: data.photoUrls[0], photos: data.photoUrls } : p,
@@ -187,7 +206,7 @@ export default function LandingPage() {
         .catch(() => {})
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placeIdsKey])
+  }, [placePhotoKey])
 
   // Warm the browser cache for every place photo as soon as its URL is known,
   // so cards and detail panels render their image instantly instead of
