@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { GOOGLE_TOKEN_URL, OAUTH_STATE_COOKIE, decodeIdToken, redirectUri } from '@/lib/oauth'
+import { GOOGLE_TOKEN_URL, OAUTH_STATE_COOKIE, appUrl, decodeIdToken, redirectUri } from '@/lib/oauth'
 import { SESSION_COOKIE, SESSION_COOKIE_OPTS, signSession } from '@/lib/session'
 import { findOrCreateUser } from '@/lib/users'
 
 function fail(req: NextRequest, code: string): NextResponse {
-  const res = NextResponse.redirect(new URL(`/login?error=${code}`, req.url))
+  const res = NextResponse.redirect(appUrl(req, `/login?error=${code}`))
   res.cookies.set(OAUTH_STATE_COOKIE, '', { ...SESSION_COOKIE_OPTS, maxAge: 0 })
   return res
 }
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
 
     const user = await findOrCreateUser(claims.email, claims.name ?? '')
 
-    const res = NextResponse.redirect(new URL('/chat', req.url))
+    const res = NextResponse.redirect(appUrl(req, '/chat'))
     res.cookies.set(OAUTH_STATE_COOKIE, '', { ...SESSION_COOKIE_OPTS, maxAge: 0 })
     res.cookies.set(SESSION_COOKIE, signSession(user.user_id, user.email), SESSION_COOKIE_OPTS)
     return res

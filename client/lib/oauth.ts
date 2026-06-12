@@ -23,6 +23,16 @@ export function redirectUri(req: NextRequest): string {
   return `${baseUrl(req)}/api/auth/google/callback`
 }
 
+/**
+ * Absolute app URL for a redirect. MUST be used instead of
+ * `new URL(path, req.url)` for redirects: behind the Cloud Run proxy `req.url`
+ * resolves to the container's internal address (0.0.0.0:8080), which the
+ * browser cannot reach (ERR_CONNECTION_CLOSED).
+ */
+export function appUrl(req: NextRequest, path: string): string {
+  return `${baseUrl(req)}${path.startsWith('/') ? path : `/${path}`}`
+}
+
 /** Decode the payload of a JWT (id_token) without signature verification. */
 export function decodeIdToken(idToken: string): { email?: string; email_verified?: boolean; name?: string; sub?: string } {
   const part = idToken.split('.')[1]
