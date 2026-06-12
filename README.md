@@ -34,19 +34,40 @@ flowchart TD
     C["Next.js client<br/>(chat · map · cards · voice · saved)"] -- "HTTPS + SSE" --> O
 
     subgraph ADK["ADK agent runtime (single Cloud Run service)"]
-        O["Orchestrator (hodari)<br/>loads profile · saves preferences · streams reply"]
-        O --> P["Planner<br/>request → Plan (goal, constraints, subtasks)"]
-        P --> E["Explorer / Map<br/>Plan → CandidateSet (5–10 grounded places)"]
-        E --> I["Itinerary<br/>Plan + CandidateSet → ordered Itinerary"]
+        O["Orchestrator<br/>loads profile · saves preferences · streams reply"]
+        O --> P["Planner<br/>request → Plan<br/>(goal · constraints · subtasks)"]
+        P --> E["Explorer / Map<br/>Plan → CandidateSet<br/>(5–10 grounded + ranked places)"]
+        E --> I["Itinerary<br/>Plan + CandidateSet → Itinerary<br/>(ordered stops · routes · voice summary)"]
     end
 
-    O <-- "MCP" --> M[("MongoDB Atlas<br/>users · places · interactions")]
-    E <-- "MCP" --> M
-    E -- "MCP" --> G["Google Maps<br/>Grounding Lite<br/>(search_places)"]
-    I -- "MCP" --> G2["Google Maps<br/>Grounding Lite<br/>(compute_routes · lookup_weather)"]
+    subgraph Mongo["MongoDB Atlas (MCP)"]
+        U[("users")]
+        PL[("places<br/>+ 768-dim embeddings")]
+        IX[("interactions<br/>+ 768-dim embeddings")]
+    end
+
+    subgraph VTX["Vertex AI"]
+        EM["text-embedding-004<br/>(768 dim, cosine)"]
+        LLM["Gemini 3.5 Flash<br/>(global endpoint)"]
+    end
+
+    O -- "load profile / save preference" --> U
+    E -- "find_places_by_vector<br/>(places vector search)" --> PL
+    E -- "find_similar_preferences<br/>(interactions vector search)" --> IX
+    E -- "embed query" --> EM
+    IX -- "embed interactions" --> EM
+    E -- "search_places (live fallback)" --> G["Google Maps<br/>Grounding Lite MCP"]
+    I -- "compute_routes<br/>lookup_weather" --> G
+    O & P & E & I -- "Gemini 3.5 Flash" --> LLM
 ```
 
 Inter-agent contracts are Pydantic schemas with one retry on malformed output: `Plan` → `CandidateSet` → `Itinerary`.
+
+**Explorer tool execution (parallel):**
+1. `find_similar_preferences` — vector search on `interactions` → past liked/disliked categories as personalization signal
+2. `find_places_by_vector` — vector search on seeded `places` → pre-embedded venue candidates
+3. `search_places` (Maps MCP) — live Google Maps call for new or niche venues
+Results are merged, deduplicated, and re-ranked using `personalization_score` (0.0–1.0).
 
 | Agent | Input | Output | Tools |
 |---|---|---|---|
