@@ -89,9 +89,12 @@ export default function SavedPage() {
   const hasCalendar = Object.keys(calendarGroups).length > 0
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#ffffff] dark:bg-[#15151a]">
+    // h-screen + internal scroll: the global `html, body { overflow: hidden }`
+    // (full-screen chat app) means this page must own its own scroll container,
+    // or long saved lists are unreachable.
+    <div className="flex h-screen flex-col overflow-hidden bg-[#ffffff] dark:bg-[#15151a]">
       {/* Header */}
-      <header className="flex items-center gap-4 border-b border-amber-100/60 bg-[#ffffff]/95 px-5 py-4 backdrop-blur-sm dark:border-amber-900/30 dark:bg-[#15151a]/95">
+      <header className="flex shrink-0 items-center gap-4 border-b border-amber-100/60 bg-[#ffffff]/95 px-5 py-4 backdrop-blur-sm dark:border-amber-900/30 dark:bg-[#15151a]/95">
         <Link href="/chat" aria-label="Back to chat" className="flex items-center gap-2 rounded-lg p-1.5 text-amber-700 transition-colors hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/30">
           <ArrowLeft className="h-4 w-4" />
         </Link>
@@ -117,7 +120,7 @@ export default function SavedPage() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6 sm:px-6">
+      <main className="mx-auto w-full max-w-3xl min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">
         {loading && (
           <div className="flex items-center justify-center py-24">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-200 border-t-amber-600" />

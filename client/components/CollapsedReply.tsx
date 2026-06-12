@@ -33,8 +33,9 @@ function useTypewriter(target: string, enabled: boolean): string {
         const full = targetRef.current.length
         if (prev >= full) return prev
         const remaining = full - prev
-        // ~2 chars min per frame, faster the further behind we are.
-        const step = Math.max(2, Math.ceil(remaining / 22))
+        // Calm, readable pace: ~1 char min per frame, a little faster the
+        // further behind we are so large bursts still catch up smoothly.
+        const step = Math.max(1, Math.ceil(remaining / 34))
         return Math.min(full, prev + step)
       })
       raf = requestAnimationFrame(tick)

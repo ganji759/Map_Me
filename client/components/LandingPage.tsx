@@ -112,6 +112,11 @@ interface HistoryItem {
 
 export default function LandingPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [userName] = useState(() =>
+    typeof window !== 'undefined'
+      ? (localStorage.getItem('hodari_name') || localStorage.getItem('hodari_email') || '')
+      : '',
+  )
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([])
   const [historyLoaded, setHistoryLoaded] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -596,9 +601,22 @@ export default function LandingPage() {
     handleSend(prompt)
   }, [handleSend])
 
+  const handleLogout = useCallback(() => {
+    cancelSpeech()
+    fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
+    try {
+      localStorage.removeItem('hodari_uid')
+      localStorage.removeItem('hodari_email')
+      localStorage.removeItem('hodari_name')
+      localStorage.removeItem('hodari_active_session')
+    } catch { /* ignore */ }
+    window.location.href = '/login'
+  }, [])
+
   const handleNewChat = useCallback(() => {
     cancelSpeech()
     sessionId.current = uid()
+    try { localStorage.setItem('hodari_active_session', sessionId.current) } catch { /* ignore */ }
     setMessages([])
     setLoading(false)
     setThinkingSteps([])
@@ -622,6 +640,7 @@ export default function LandingPage() {
     if (!item) return
     cancelSpeech()
     sessionId.current = item.id
+    try { localStorage.setItem('hodari_active_session', item.id) } catch { /* ignore */ }
     setMessages(item.messages)
     setLoading(false)
     setThinkingSteps([])
@@ -665,7 +684,18 @@ export default function LandingPage() {
     try {
       const savedHistory = localStorage.getItem('hodari_history')
       const parsed = savedHistory ? JSON.parse(savedHistory) as HistoryItem[] : []
-      if (Array.isArray(parsed)) setHistoryItems(parsed.slice(0, 20))
+      const items = Array.isArray(parsed) ? parsed.slice(0, 20) : []
+      setHistoryItems(items)
+      // Resume the conversation we left (e.g. after visiting Saved places) instead
+      // of starting a blank one — unless we were already in a fresh, unsent chat.
+      const activeId = localStorage.getItem('hodari_active_session')
+      const active = activeId ? items.find((it) => it.id === activeId) : undefined
+      if (active) {
+        sessionId.current = active.id
+        setMessages(active.messages)
+      } else {
+        localStorage.setItem('hodari_active_session', sessionId.current)
+      }
     } catch {
       setHistoryItems([])
     } finally {
@@ -680,6 +710,8 @@ export default function LandingPage() {
 
   useEffect(() => {
     if (!messages.length) return
+    // Remember which conversation is active so a round-trip to /saved resumes it.
+    try { localStorage.setItem('hodari_active_session', sessionId.current) } catch { /* ignore */ }
     const firstUserMessage = messages.find((m) => m.role === 'user') ?? messages[0]
     const title = firstUserMessage.content.replace(/\s+/g, ' ').trim().slice(0, 56) || 'Untitled chat'
     const id = sessionId.current
@@ -828,6 +860,8 @@ export default function LandingPage() {
       uiMode={uiMode}
       onEnterChatMode={enterChatMode}
       onEnterVoiceMode={enterVoiceMode}
+      userName={userName}
+      onLogout={handleLogout}
     />
   )
 

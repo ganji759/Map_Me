@@ -6,6 +6,7 @@ import {
   Bookmark,
   ChevronDown,
   History,
+  LogOut,
   Map as MapIcon,
   MapPin,
   Menu,
@@ -70,6 +71,8 @@ interface Props {
   uiMode?: 'chat' | 'voice'
   onEnterChatMode?: () => void
   onEnterVoiceMode?: () => void
+  userName?: string
+  onLogout?: () => void
 }
 
 const CHIPS = [
@@ -117,6 +120,8 @@ export function ChatPanel({
   uiMode = 'chat',
   onEnterChatMode,
   onEnterVoiceMode,
+  userName,
+  onLogout,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -359,7 +364,7 @@ export function ChatPanel({
                     Hodari
                   </p>
                   {msg.content ? (
-                    <div className="w-full rounded-2xl rounded-tl-md border border-gray-200/80 bg-white px-4 py-3 shadow-[0_2px_12px_rgba(0,0,0,0.05)] dark:border-white/[0.08] dark:bg-[#15151a] dark:shadow-[0_2px_12px_rgba(0,0,0,0.45)]">
+                    <div className="w-full px-1">
                       <CollapsibleMessage
                         content={msg.content}
                         streaming={streaming && msg.id === lastMsgId}
@@ -462,8 +467,8 @@ export function ChatPanel({
           type="button"
           aria-label="Close chat history"
           onClick={() => setHistoryOpen(false)}
-          className="fixed inset-0 z-[49] md:hidden"
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.15)' }}
+          className="fixed inset-0 z-[49]"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.28)' }}
         />
       )}
 
@@ -560,11 +565,10 @@ export function ChatPanel({
         </div>
       </aside>
 
-      <div
-        className={`flex min-h-0 flex-1 flex-col bg-transparent transition-[margin-left] duration-[220ms] ease ${
-          historyOpen ? 'md:ml-[240px]' : 'md:ml-0'
-        }`}
-      >
+      {/* History is an overlay drawer (with a backdrop), NOT a layout push —
+          the chat panel can be a narrow centered column, and pushing it by the
+          drawer width crushed the header. */}
+      <div className="flex min-h-0 flex-1 flex-col bg-transparent">
         <div
           className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 bg-transparent px-4 pb-3 pt-3.5 sm:px-5"
           style={{ backgroundColor: theme === 'dark' ? 'rgba(21, 21, 26, 0.35)' : 'rgba(255, 255, 255, 0.3)' }}
@@ -623,6 +627,27 @@ export function ChatPanel({
               <button type="button" onClick={onCollapse} aria-label="Collapse chat" className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)]">
                 <PanelLeftClose className="h-4 w-4" />
               </button>
+            )}
+            {onLogout && (
+              <div className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-header)]/90 py-1 pl-2.5 pr-1 shadow-sm">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#F56A00] text-[11px] font-semibold text-white">
+                  {(userName?.trim()?.[0] ?? 'U').toUpperCase()}
+                </span>
+                {userName && (
+                  <span className="hidden max-w-[120px] truncate text-[12px] font-medium text-[var(--text-primary)] sm:block">
+                    {userName}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  aria-label="Log out"
+                  title="Log out"
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--text-secondary)] transition-colors hover:bg-red-500/10 hover:text-red-500"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </div>
             )}
           </div>
         </div>
