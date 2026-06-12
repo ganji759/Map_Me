@@ -474,12 +474,12 @@ export function ChatPanel({
 
       <aside
         aria-hidden={!historyOpen}
-        className={`fixed left-0 top-0 z-50 h-full w-[240px] border-r border-[var(--border)] shadow-2xl transition-transform duration-[220ms] ease ${
+        className={`fixed left-0 top-0 z-50 flex h-full w-[240px] flex-col border-r border-[var(--border)] shadow-2xl transition-transform duration-[220ms] ease ${
           historyOpen ? 'translate-x-0' : '-translate-x-full pointer-events-none'
         }`}
         style={{ backgroundColor: theme === 'dark' ? '#15151a' : '#ffffff' }}
       >
-        <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
+        <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-4 py-3">
           <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-[var(--text-secondary)] dark:text-gray-200">
             <History className="h-3.5 w-3.5" /> History
           </span>
@@ -487,7 +487,7 @@ export function ChatPanel({
             ×
           </button>
         </div>
-        <div className="p-3">
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
           <input
             type="search"
             value={historyQuery}
@@ -563,6 +563,31 @@ export function ChatPanel({
             )}
           </div>
         </div>
+
+        {onLogout && (
+          <div className="shrink-0 border-t border-[var(--border)] p-3">
+            <div className="flex items-center gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg-header)]/70 px-3 py-2.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F56A00] text-[12px] font-semibold text-white">
+                {(userName?.trim()?.[0] ?? 'U').toUpperCase()}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-medium text-[var(--text-primary)]">
+                  {userName || 'Signed in'}
+                </p>
+                <p className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)]">Your account</p>
+              </div>
+              <button
+                type="button"
+                onClick={onLogout}
+                aria-label="Log out"
+                title="Log out"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--text-secondary)] transition-colors hover:bg-red-500/10 hover:text-red-500"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </aside>
 
       {/* History is an overlay drawer (with a backdrop), NOT a layout push —
@@ -576,7 +601,6 @@ export function ChatPanel({
           <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
             <div className="min-w-0">
               <h1 className="font-display text-lg font-semibold text-[var(--text-primary)]">Hodari</h1>
-              <p className="mt-0.5 text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">FIFA World Cup 2026 · Guide</p>
             </div>
             {modeToggle}
           </div>
@@ -627,27 +651,6 @@ export function ChatPanel({
               <button type="button" onClick={onCollapse} aria-label="Collapse chat" className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)]">
                 <PanelLeftClose className="h-4 w-4" />
               </button>
-            )}
-            {onLogout && (
-              <div className="flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-header)]/90 py-1 pl-2.5 pr-1 shadow-sm">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#F56A00] text-[11px] font-semibold text-white">
-                  {(userName?.trim()?.[0] ?? 'U').toUpperCase()}
-                </span>
-                {userName && (
-                  <span className="hidden max-w-[120px] truncate text-[12px] font-medium text-[var(--text-primary)] sm:block">
-                    {userName}
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={onLogout}
-                  aria-label="Log out"
-                  title="Log out"
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--text-secondary)] transition-colors hover:bg-red-500/10 hover:text-red-500"
-                >
-                  <LogOut className="h-4 w-4" />
-                </button>
-              </div>
             )}
           </div>
         </div>
