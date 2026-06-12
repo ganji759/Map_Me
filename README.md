@@ -1,32 +1,39 @@
 # Hodari
 
-**A multi-agent tourist AI assistant for the 2026 FIFA World Cup.** Hodari helps football fans plan grounded, personalized itineraries — *"4 hours, $60, vegetarian near Camp Nou"* — through a conversational interface backed by real Google Maps data, and renders them on an interactive map with feasible walking routes.
+**A multi-agent tourist AI assistant for the 2026 FIFA World Cup.** Hodari helps football fans plan grounded, personalized itineraries through a conversational interface backed by real Google Maps data, and renders them on an interactive map with walking/driving routes.
 
 > Hodari (Swahili: *brave / capable*) turns a fan's free time between matches into a concrete plan: where to eat, what to see, and how to get there.
 
+**Live:** https://hodari-frontend-377773225771.us-central1.run.app
+
 ---
 
-## What it does
+## Features
 
-- **Conversational planning** — describe your time, budget, dietary needs, and location in plain language; Hodari streams back a friendly, structured plan.
-- **Grounded place search** — candidates come from Google Maps (via the Maps Grounding Lite MCP), so places, ratings, and coordinates are real, not hallucinated.
-- **Feasible itineraries** — stops are ordered to minimize walking, with real route distances/durations and polylines drawn on the map.
-- **Weather-aware** — the itinerary agent checks conditions and nudges toward indoor/shaded venues when it matters.
-- **Personalization** — thumbs-up/down and visit signals are stored per user and used to re-rank future suggestions.
-- **Interactive map UI** — custom pins, route overlays, expandable place cards, and per-place follow-up chat ("Tell me more", "Why this stop?").
-- **Push-to-talk voice**, **dark/light themes**, and a **PWA** install target.
+- **Conversational planning** — describe time, budget, dietary needs, and location in plain language; Hodari streams back a structured plan.
+- **Grounded place search** — places come from Google Maps (Maps Grounding Lite MCP): real names, coordinates, ratings, hours, and photos — no hallucinations.
+- **Feasible itineraries** — stops are ordered to minimize travel, with real distances, durations, and polylines drawn on the map.
+- **Place photos** — restaurant and venue photos are auto-fetched from the Places API and shown directly on the sidebar cards.
+- **Save places** — bookmark any place from the sidebar; saved items persist per user. Access them at `/saved`.
+- **Visit planner** — on the Saved page, set a visit date and note for each saved place. A calendar view groups planned visits by month.
+- **Personalization** — interaction signals (liked, saved, visited) are stored per user in MongoDB and used to re-rank future suggestions.
+- **Interactive map** — custom pins, route polylines, expandable place cards, full-screen mode, and per-place follow-up chat.
+- **Push-to-talk voice** — server-side Gemini STT + TTS via Vertex AI.
+- **Chat history with delete** — conversations are saved in the browser; hover any entry in the sidebar to delete it.
+- **Email login** — no passwords; enter a name + email to create or resume a fan profile stored in MongoDB.
+- **Dark / light themes** and a **PWA** install target.
 
 ---
 
 ## Architecture
 
-Four agents, run **in a single process** with in-process routing (not four services). The Orchestrator owns session state and streams the final answer to the client over SSE.
+Four agents run **in a single process** (in-process routing, not four services). The Orchestrator owns session state and streams the final answer to the client over SSE.
 
 ```mermaid
 flowchart TD
-    C["Next.js client<br/>(chat · map · cards · voice)"] -- "HTTPS + SSE" --> O
+    C["Next.js client<br/>(chat · map · cards · voice · saved)"] -- "HTTPS + SSE" --> O
 
-    subgraph ADK["ADK agent runtime (one process)"]
+    subgraph ADK["ADK agent runtime (single Cloud Run service)"]
         O["Orchestrator (hodari)<br/>loads profile · saves preferences · streams reply"]
         O --> P["Planner<br/>request → Plan (goal, constraints, subtasks)"]
         P --> E["Explorer / Map<br/>Plan → CandidateSet (5–10 grounded places)"]
@@ -39,14 +46,28 @@ flowchart TD
     I -- "MCP" --> G2["Google Maps<br/>Grounding Lite<br/>(compute_routes · lookup_weather)"]
 ```
 
-**Inter-agent contracts** are Pydantic schemas, validated with one retry on malformed output: `Plan` → `CandidateSet` → `Itinerary` (see `agents/hodari/schemas/contracts.py`).
+Inter-agent contracts are Pydantic schemas with one retry on malformed output: `Plan` → `CandidateSet` → `Itinerary`.
 
 | Agent | Input | Output | Tools |
 |---|---|---|---|
-| **Orchestrator** | user message + profile + history | streamed natural-language reply | `load_user_profile`, `save_preference` (MongoDB MCP) |
-| **Planner** | request + profile | `Plan` | none (pure reasoning) |
-| **Explorer / Map** | `Plan` | `CandidateSet` | `search_places` (Maps MCP), `find_similar_preferences` / vector lookup (Mongo) |
+| **Orchestrator** | user message + profile + history | streamed reply | `load_user_profile`, `save_preference` (MongoDB MCP) |
+| **Planner** | request + profile | `Plan` | none — pure reasoning |
+| **Explorer / Map** | `Plan` | `CandidateSet` | `search_places` (Maps MCP), `find_similar_preferences` (Mongo) |
 | **Itinerary** | `Plan` + `CandidateSet` | `Itinerary` | `compute_routes`, `lookup_weather` (Maps MCP) |
+
+### Production deployment
+
+Both services run on **Google Cloud Run** with a **MongoDB MCP sidecar** container:
+
+```
+hodari-agent (port 8080)        ← Python ADK server
+  + mongodb-mcp sidecar (3100)  ← MCP bridge to Atlas
+
+hodari-frontend (port 3000)     ← Next.js standalone
+  + mongodb-mcp sidecar (3100)  ← MCP bridge (for login route)
+```
+
+Cloud Run service definitions live in `infra/`. Secrets (MongoDB URI, Maps API key) are stored in Google Secret Manager and injected at runtime.
 
 ---
 
@@ -55,14 +76,15 @@ flowchart TD
 | Layer | Technology |
 |---|---|
 | Frontend | Next.js 15 (App Router), React 18, Tailwind CSS, PWA |
-| Map UI | Google Maps JavaScript API via `@vis.gl/react-google-maps` |
+| Map UI | Google Maps JavaScript API + Places API |
 | Agent runtime | Python 3.12, Google Agent Development Kit (ADK) |
-| LLM | Gemini 3.5 Flash via Vertex AI |
-| Database | MongoDB Atlas (`users`, `places`, `interactions`) |
-| DB access | MongoDB MCP Server (no direct driver) |
+| LLM | Gemini 3.5 Flash via Vertex AI (`global` endpoint) |
+| Database | MongoDB Atlas — `users`, `places`, `interactions` |
+| DB access | MongoDB MCP Server (sidecar, no direct driver) |
 | Maps grounding | Maps Grounding Lite MCP (`https://mapstools.googleapis.com/mcp`) |
 | Schemas | Pydantic |
-| Deployment | Google Cloud Run (Dockerized agents), Vercel/Cloud Run (client) |
+| Secrets | Google Secret Manager |
+| Deployment | Google Cloud Run (agent + frontend) |
 
 ---
 
@@ -70,25 +92,40 @@ flowchart TD
 
 ```
 Map_Me/
-├── agents/                     # Python agent backend (ADK)
+├── agents/
 │   ├── hodari/
 │   │   ├── agent.py            # Orchestrator + SequentialAgent pipeline
 │   │   ├── sub_agents/         # planner.py · explorer.py · itinerary.py
-│   │   ├── tools/              # maps_mcp.py · mongo_tools.py · places_tools.py
+│   │   ├── tools/              # maps_mcp.py · mongo_tools.py · pipeline_tool.py
 │   │   └── schemas/            # contracts.py (Plan, CandidateSet, Itinerary)
-│   ├── scripts/                # seed_places.py, create_indexes.py (Phase 2)
-│   ├── services/               # remote_pipeline.py (per-service Cloud Run variant)
-│   ├── tests/                  # pytest: contracts, mongo tools
-│   ├── requirements.txt
 │   ├── Dockerfile
+│   ├── cloudbuild.yaml         # builds agent image via Cloud Build
+│   ├── requirements.txt
 │   └── .env.example
-├── client/                     # Next.js frontend
-│   ├── app/                    # page.tsx, layout, api/ (chat · session · feedback)
-│   ├── components/             # ChatPanel · MapView · ItineraryStack · VoiceButton · ModelSwitcher
-│   ├── lib/                    # types.ts · stream.ts · text.ts
-│   └── .env.local.example
-├── Hodari_System_Architecture.md   # full design spec
-└── CLAUDE.md                   # working notes & conventions
+├── client/
+│   ├── app/
+│   │   ├── page.tsx            # landing page
+│   │   ├── chat/page.tsx       # main chat + map interface
+│   │   ├── login/page.tsx      # email login
+│   │   ├── saved/page.tsx      # saved places + visit calendar
+│   │   └── api/                # chat · session · feedback · saved · place-photos · directions · voice
+│   ├── components/
+│   │   ├── ChatPanel.tsx       # chat, history sidebar, voice
+│   │   ├── LandingPage.tsx     # root layout + state management
+│   │   ├── MapView.tsx         # map with pins and route overlays
+│   │   ├── PlaceListPanel.tsx  # sidebar place cards with photos + save button
+│   │   ├── PlaceDetailsPanel.tsx
+│   │   ├── ModelSwitcher.tsx
+│   │   └── landing/            # landing page components
+│   ├── lib/                    # types.ts · stream.ts · mapActions.ts · voice.ts
+│   ├── Dockerfile
+│   └── cloudbuild.yaml         # builds frontend image via Cloud Build
+├── infra/
+│   ├── cloudrun-agent.yaml     # Cloud Run service definition (agent + MCP sidecar)
+│   ├── cloudrun-frontend.yaml  # Cloud Run service definition (frontend + MCP sidecar)
+│   └── mongodb-mcp/Dockerfile  # pre-installs mongodb-mcp-server
+├── Hodari_System_Architecture.md
+└── CLAUDE.md
 ```
 
 ---
@@ -99,151 +136,125 @@ Map_Me/
 - **Python 3.12** (official CPython — MSYS2/MinGW Python lacks `pydantic-core` wheels)
 - **MongoDB Atlas** cluster + connection string
 - **Google Cloud project** with these APIs enabled:
-  - Vertex AI API (for Gemini)
-  - Maps Grounding Lite API (backend grounding)
-  - Maps JavaScript API + Places API (frontend map)
-- **gcloud CLI** (for local Vertex auth) — `winget install Google.CloudSDK`
+  - Vertex AI API
+  - Maps Grounding Lite API
+  - Maps JavaScript API + Places API
+- **gcloud CLI** — `winget install Google.CloudSDK`
 
 ---
 
-## Setup (one-time)
+## Local development
 
-**1. Clone and configure environment files**
+Three processes, each in its own terminal. Start them in order.
 
-```bash
-# Backend
-cp agents/.env.example agents/.env            # then fill in the values
-
-# Frontend
-cp client/.env.local.example client/.env.local # then fill in the values
+```
+:3100  MongoDB MCP server  →  :8000  ADK agents  →  :3000  Next.js client
 ```
 
-**2. Backend: create the virtualenv and install deps**
+**Terminal 1 — MongoDB MCP server:**
+
+```bash
+# macOS / Linux
+MDB_MCP_CONNECTION_STRING="<Atlas URI>" npx mongodb-mcp-server --transport http --httpPort=3100
+
+# Windows PowerShell
+$env:MDB_MCP_CONNECTION_STRING="<Atlas URI>"; npx mongodb-mcp-server --transport http --httpPort=3100
+```
+
+**Terminal 2 — ADK agents:**
 
 ```bash
 cd agents
-py -3.12 -m venv .venv                         # Windows: use the py launcher
-# Activate — Windows PowerShell:
+
+# First-time: create venv
+py -3.12 -m venv .venv
+
+# Activate — Windows PowerShell
 .\.venv\Scripts\Activate.ps1
-# Activate — macOS/Linux:
+# Activate — macOS / Linux
 source .venv/bin/activate
 
 pip install -r requirements.txt
-```
+cp .env.example .env    # fill in values
 
-**3. Frontend: install deps**
-
-```bash
-cd client
-npm install
-```
-
-**4. Authenticate to Vertex AI** (one-time; the agents use ADC, not an API key)
-
-```bash
-gcloud auth application-default login
-```
-
-### Environment variables
-
-**`agents/.env`**
-
-| Variable | Purpose |
-|---|---|
-| `GOOGLE_GENAI_USE_VERTEXAI` | `TRUE` — route Gemini through Vertex AI |
-| `GOOGLE_CLOUD_PROJECT` | your GCP project **ID** |
-| `GOOGLE_CLOUD_LOCATION` | `global` — required; Gemini 3.x is served only from the global Vertex endpoint (regional endpoints like `us-central1` return 404) |
-| `GEMINI_MODEL` | `gemini-3.5-flash` |
-| `GOOGLE_MAPS_API_KEY` | backend key, restricted to Maps Grounding Lite |
-| `MONGODB_URI` | Atlas connection string |
-| `MONGODB_DATABASE` | `hodari` |
-| `MONGODB_MCP_URL` | `http://localhost:3100/mcp` |
-
-**`client/.env.local`**
-
-| Variable | Purpose |
-|---|---|
-| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | frontend key (Maps JS API + Places); referrer-restrict to `localhost:3000/*` |
-| `ADK_BASE_URL` | `http://localhost:8000` |
-| `ADK_APP_NAME` | `hodari` |
-
----
-
-## Running locally
-
-Hodari runs as **three processes**, each in its own terminal. Start them **in order** — later ones depend on earlier ones.
-
-```
-:3100  MongoDB MCP server   →  :8000  ADK agents API   →  :3000  Next.js client
-```
-
-**Terminal 1 — MongoDB MCP server** (uses your `MONGODB_URI`):
-
-```bash
-# macOS/Linux
-MDB_MCP_CONNECTION_STRING="<your Atlas URI>" npx mongodb-mcp-server --transport http --httpPort=3100
-```
-```powershell
-# Windows PowerShell
-$env:MDB_MCP_CONNECTION_STRING="<your Atlas URI>"; npx mongodb-mcp-server --transport http --httpPort=3100
-```
-
-**Terminal 2 — ADK agents API:**
-
-```bash
-cd agents
-# macOS/Linux (venv activated):
-adk api_server hodari
-# Windows — call the venv's adk.exe directly (a global adk can shadow it and fail to load `mcp`):
+# Start (call the venv's adk directly on Windows to avoid PATH shadowing)
 .\.venv\Scripts\adk.exe api_server hodari
+# macOS / Linux
+adk api_server hodari
 ```
 
 **Terminal 3 — Next.js client:**
 
 ```bash
 cd client
+npm install
+cp .env.local.example .env.local   # fill in values
 npm run dev
 ```
 
-Then open **http://localhost:3000** and try: *"4 hrs, $60, vegetarian near Camp Nou"*.
+Open **http://localhost:3000**. Verify with `curl http://localhost:8000/list-apps` → `["hodari"]`.
 
-> **Verify:** `curl http://localhost:8000/list-apps` should return `["hodari"]`.
->
-> **Frontend-only loop:** to work on UI without the agent stack, run just Terminal 3 — the page renders, but chat won't get real replies until `:8000` is up.
+### Environment variables
 
-### Other commands
+**`agents/.env`**
+
+| Variable | Value |
+|---|---|
+| `GOOGLE_GENAI_USE_VERTEXAI` | `TRUE` |
+| `GOOGLE_CLOUD_PROJECT` | your GCP project ID |
+| `GOOGLE_CLOUD_LOCATION` | `global` (Gemini 3.x is only served from the global Vertex endpoint) |
+| `GEMINI_MODEL` | `gemini-3.5-flash` |
+| `GOOGLE_MAPS_API_KEY` | backend key — enable Maps Grounding Lite API |
+| `MONGODB_URI` | Atlas connection string |
+| `MONGODB_DATABASE` | `hodari` |
+| `MONGODB_MCP_URL` | `http://localhost:3100/mcp` |
+
+**`client/.env.local`**
+
+| Variable | Value |
+|---|---|
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | frontend key — enable Maps JS API + Places API |
+| `GOOGLE_MAPS_SERVER_KEY` | server-side key for the Places photo proxy (can be the same key) |
+| `ADK_BASE_URL` | `http://localhost:8000` |
+| `ADK_APP_NAME` | `hodari` |
+| `MONGODB_MCP_URL` | `http://localhost:3100/mcp` |
+| `MONGODB_DATABASE` | `hodari` |
+
+---
+
+## Deployment (Google Cloud Run)
+
+Both images are built via Cloud Build (no local Docker needed).
 
 ```bash
-# Agent-testing web UI (instead of the API server)
-.\.venv\Scripts\adk.exe web hodari
+# Build frontend
+gcloud builds submit --config client/cloudbuild.yaml --project <PROJECT_ID> client/
 
-# Frontend
-npm run build        # production build
-npm run lint
+# Build agent
+gcloud builds submit --config agents/cloudbuild.yaml --project <PROJECT_ID> agents/
 
-# Backend tests
-cd agents && pytest
+# After each build, pin the new digest in infra/cloudrun-*.yaml then:
+gcloud run services replace infra/cloudrun-frontend.yaml --region us-central1 --project <PROJECT_ID>
+gcloud run services replace infra/cloudrun-agent.yaml   --region us-central1 --project <PROJECT_ID>
+
+# Make services public (first deploy only)
+gcloud run services add-iam-policy-binding hodari-frontend --member="allUsers" --role="roles/run.invoker" --region us-central1
+gcloud run services add-iam-policy-binding hodari-agent   --member="allUsers" --role="roles/run.invoker" --region us-central1
 ```
+
+**Secrets required in Secret Manager:** `MONGODB_URI`, `GOOGLE_MAPS_API_KEY`, `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`.
 
 ---
 
 ## Build phasing
 
-The repo is built **MVP-first**: prove the grounded loop before adding cost/complexity.
-
-- **MVP** — Orchestrator → Explorer (`search_places`) → Itinerary (`compute_routes`), all in one process. Personalization re-ranks Maps candidates against the `interactions` history.
-- **Phase 2** — vectorized `places` collection + Atlas Vector Search, per-agent Cloud Run services, weather-driven itineraries. The `agents/scripts/` seeders and `agents/services/` support this.
+- **MVP (current)** — Orchestrator → Explorer (`search_places`) → Itinerary (`compute_routes`), all in one process. Personalization re-ranks Maps candidates against the `interactions` history.
+- **Phase 2** — vectorized `places` collection + Atlas Vector Search, per-agent Cloud Run services, weather-driven itineraries.
 
 See [`Hodari_System_Architecture.md`](./Hodari_System_Architecture.md) for the full spec.
 
 ---
 
-## Deployment
-
-Agents are containerized (`agents/Dockerfile`) and deploy to **Google Cloud Run**; the frontend deploys to **Vercel** or Cloud Run behind a CDN. In production, Gemini authenticates via Vertex AI + a service account, and secrets live in Google Secret Manager.
-
----
-
 ## Out of scope (MVP)
 
-Booking/payments, email, calendar sync, OAuth integrations, and multilingual support are intentionally deferred.
+Booking/payments, email notifications, calendar sync, OAuth, and multilingual support are intentionally deferred.
