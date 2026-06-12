@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { asId, getSessionUser } from '@/lib/session'
 
 const MCP_URL = process.env.MONGODB_MCP_URL ?? 'http://localhost:3100/mcp'
 const DB = process.env.MONGODB_DATABASE ?? 'hodari'
@@ -24,9 +25,18 @@ async function mcpSession(): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId, placeId, placeName, city, action } = await req.json()
-  if (!userId || !placeId || !action) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  const body = await req.json().catch(() => ({}))
+  let userId: string
+  let placeId: string
+  try {
+    userId = getSessionUser(req) ?? asId(body.userId, 'userId')
+    placeId = asId(body.placeId, 'placeId')
+  } catch {
+    return NextResponse.json({ error: 'Missing or invalid userId/placeId' }, { status: 400 })
+  }
+  const { placeName, city, action } = body
+  if (!action || typeof action !== 'string') {
+    return NextResponse.json({ error: 'Missing action' }, { status: 400 })
   }
 
   try {

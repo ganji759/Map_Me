@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { asId, asIdOrNull, getSessionUser } from '@/lib/session'
 
 const MCP_URL = process.env.MONGODB_MCP_URL ?? 'http://localhost:3100/mcp'
 const DB = process.env.MONGODB_DATABASE ?? 'hodari'
@@ -72,9 +73,11 @@ async function mcpCall(sid: string, name: string, args: Record<string, unknown>)
   return []
 }
 
-// GET /api/saved?userId=X — fetch saved interactions
+// GET /api/saved — fetch saved interactions for the authenticated user.
+// Identity comes from the signed session cookie; the ?userId= param is only a
+// fallback for clients that predate the cookie (see SECURITY_HARDENING.md P0.1).
 export async function GET(req: NextRequest) {
-  const userId = req.nextUrl.searchParams.get('userId')
+  const userId = getSessionUser(req) ?? asIdOrNull(req.nextUrl.searchParams.get('userId'))
   if (!userId) return NextResponse.json({ saved: [] })
 
   try {
@@ -99,8 +102,16 @@ export async function GET(req: NextRequest) {
 
 // POST /api/saved — upsert a reminder with a visitDate
 export async function POST(req: NextRequest) {
-  const { userId, placeId, placeName, city, visitDate, note } = await req.json()
-  if (!userId || !placeId) return NextResponse.json({ error: 'Missing userId or placeId' }, { status: 400 })
+  const body = await req.json().catch(() => ({}))
+  let userId: string
+  let placeId: string
+  try {
+    userId = getSessionUser(req) ?? asId(body.userId, 'userId')
+    placeId = asId(body.placeId, 'placeId')
+  } catch {
+    return NextResponse.json({ error: 'Missing or invalid userId/placeId' }, { status: 400 })
+  }
+  const { placeName, city, visitDate, note } = body
 
   try {
     const sid = await mcpSession()

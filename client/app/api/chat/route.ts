@@ -1,4 +1,6 @@
 import { NextRequest } from 'next/server'
+import { asId, getSessionUser } from '@/lib/session'
+import { clientIp, rateLimit } from '@/lib/rateLimit'
 
 // Full pipeline (Planner → Explorer → Itinerary) can exceed 2 minutes locally.
 export const maxDuration = 300
@@ -7,11 +9,32 @@ const ADK_BASE = process.env.ADK_BASE_URL ?? 'http://localhost:8000'
 const APP_NAME = process.env.ADK_APP_NAME ?? 'hodari'
 
 export async function POST(req: NextRequest) {
-  const { message, userId, sessionId } = await req.json()
+  // Chat runs the agent pipeline (Gemini + Maps tokens) — throttle per IP so a
+  // single client can't drive runaway cost.
+  const rl = rateLimit(`chat:${clientIp(req)}`, { capacity: 12, refillPerSec: 0.2 })
+  if (!rl.allowed) {
+    return new Response('Too many requests. Please slow down.', {
+      status: 429,
+      headers: { 'Retry-After': String(rl.retryAfterSec) },
+    })
+  }
+
+  const body = await req.json().catch(() => ({}))
+  const message = typeof body.message === 'string' ? body.message : ''
+  // Identity comes from the session cookie; the body userId is a legacy
+  // fallback so the agent always writes under the right (validated) user.
+  let userId: string
+  let sessionId: string
+  try {
+    userId = getSessionUser(req) ?? asId(body.userId, 'userId')
+    sessionId = asId(body.sessionId, 'sessionId')
+  } catch {
+    return new Response('Missing or invalid userId/sessionId', { status: 400 })
+  }
 
   // Ensure the session exists before running
   await fetch(
-    `${ADK_BASE}/apps/${APP_NAME}/users/${userId}/sessions/${sessionId}`,
+    `${ADK_BASE}/apps/${APP_NAME}/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(sessionId)}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
   ).catch(() => {/* session may already exist */})
 

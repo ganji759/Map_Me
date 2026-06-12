@@ -15,7 +15,7 @@ spec:
       serviceAccountName: hodari-agent@mapsme-498314.iam.gserviceaccount.com
       containers:
       - name: hodari-frontend
-        image: us-central1-docker.pkg.dev/mapsme-498314/hodari/frontend@sha256:89584a5828b1e7f490c7fd113a1c8c07a7b1afd02c209cb9400027fc4096f409
+        image: us-central1-docker.pkg.dev/mapsme-498314/hodari/frontend@sha256:98fa866b203d765bad6c238aea8d4b743cbd58492e98b44e6ad3df53b750d131
         ports:
         - containerPort: 3000
         resources:
@@ -46,6 +46,13 @@ spec:
           valueFrom:
             secretKeyRef:
               name: MONGODB_URI
+              key: latest
+        # Signs the httpOnly session cookie so identity is server-authoritative
+        # (see SECURITY_HARDENING.md P0.1).
+        - name: HODARI_SESSION_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: HODARI_SESSION_SECRET
               key: latest
 
       # ── MongoDB MCP sidecar (for login route) ─────────────────────────────

@@ -32,6 +32,17 @@ interface Bucket {
   updatedAt: number
 }
 
+/**
+ * Best-effort client IP for rate-limit keying. On Cloud Run the real client is
+ * the first hop in `x-forwarded-for`; fall back to a constant so a missing
+ * header still shares one bucket rather than bypassing the limit entirely.
+ */
+export function clientIp(req: { headers: { get(name: string): string | null } }): string {
+  const fwd = req.headers.get('x-forwarded-for')
+  if (fwd) return fwd.split(',')[0].trim()
+  return req.headers.get('x-real-ip')?.trim() || 'unknown'
+}
+
 const buckets = new Map<string, Bucket>()
 
 // Bound memory: once we cross this many keys, drop buckets that have fully

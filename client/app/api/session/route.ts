@@ -1,20 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { asId, getSessionUser } from '@/lib/session'
 
 const ADK_BASE = process.env.ADK_BASE_URL ?? 'http://localhost:8000'
 const APP_NAME = process.env.ADK_APP_NAME ?? 'hodari'
 
-// Returns session state (plan, candidates, itinerary) after agent finishes
+// Returns session state (plan, candidates, itinerary) after agent finishes.
+// Identity comes from the session cookie; the ?userId= param is a legacy
+// fallback. Path ids are validated + encoded to prevent path injection.
 export async function GET(req: NextRequest) {
-  const { searchParams } = req.nextUrl
-  const userId = searchParams.get('userId')
-  const sessionId = searchParams.get('sessionId')
-
-  if (!userId || !sessionId) {
-    return NextResponse.json({ error: 'Missing params' }, { status: 400 })
+  let userId: string
+  let sessionId: string
+  try {
+    userId = getSessionUser(req) ?? asId(req.nextUrl.searchParams.get('userId'), 'userId')
+    sessionId = asId(req.nextUrl.searchParams.get('sessionId'), 'sessionId')
+  } catch {
+    return NextResponse.json({ error: 'Missing or invalid params' }, { status: 400 })
   }
 
   const res = await fetch(
-    `${ADK_BASE}/apps/${APP_NAME}/users/${userId}/sessions/${sessionId}`,
+    `${ADK_BASE}/apps/${APP_NAME}/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(sessionId)}`,
   )
 
   if (!res.ok) return NextResponse.json({}, { status: 200 })

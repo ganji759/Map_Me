@@ -1,7 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { SESSION_COOKIE, SESSION_MAX_AGE, signSession } from '@/lib/session'
+import { clientIp, rateLimit } from '@/lib/rateLimit'
 
 const MCP_URL = process.env.MONGODB_MCP_URL ?? 'http://localhost:3100/mcp'
 const DB = process.env.MONGODB_DATABASE ?? 'hodari'
+
+/**
+ * Build the login response with a signed, httpOnly session cookie so later
+ * requests prove identity server-side instead of trusting a client `userId`.
+ * Guarded: if HODARI_SESSION_SECRET is not configured yet, sign-in still works
+ * (no cookie) — the data routes keep their validated-param fallback until the
+ * secret is rolled out. See SECURITY_HARDENING.md (P0.1).
+ */
+function withSession(payload: Record<string, unknown>, userId: string, email: string): NextResponse {
+  const res = NextResponse.json(payload)
+  try {
+    res.cookies.set(SESSION_COOKIE, signSession(userId, email), {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: SESSION_MAX_AGE,
+    })
+  } catch {
+    /* secret not configured yet — fall back to param-based identity */
+  }
+  return res
+}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -115,6 +140,15 @@ function slugifyId(name: string, email: string): string {
 }
 
 export async function POST(req: NextRequest) {
+  // Throttle sign-in attempts per IP to blunt credential stuffing / abuse.
+  const rl = rateLimit(`login:${clientIp(req)}`, { capacity: 15, refillPerSec: 0.3 })
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Too many sign-in attempts. Please wait a moment and try again.' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } },
+    )
+  }
+
   let email: string
   let name: string
   try {
@@ -150,7 +184,7 @@ export async function POST(req: NextRequest) {
         })
         doc.name = name
       }
-      return NextResponse.json({ user: publicUser(doc), isNew: false })
+      return withSession({ user: publicUser(doc), isNew: false }, String(doc.user_id), email)
     }
 
     // First sign-in: create a profile matching the existing users schema.
@@ -175,7 +209,7 @@ export async function POST(req: NextRequest) {
     }
     await mcpCall(sid, 'insert-many', { database: DB, collection: 'users', documents: [doc] })
 
-    return NextResponse.json({ user: publicUser(doc), isNew: true })
+    return withSession({ user: publicUser(doc), isNew: true }, userId, email)
   } catch (err) {
     console.error('[auth/login]', err)
     const detail = 'Sign-in is temporarily unavailable. Please try again in a moment.'
