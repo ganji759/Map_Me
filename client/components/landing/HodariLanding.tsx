@@ -153,12 +153,12 @@ export default function HodariLanding() {
             Hodari, your AI companion for the 2026 FIFA World Cup
           </p>
           <h1 className="max-w-[20ch] animate-[fadeUp_0.8s_0.18s_both] motion-reduce:animate-none font-display font-semibold leading-[1.08] tracking-[-0.02em] text-gray-900 dark:text-gray-50 text-[clamp(1.7rem,6.4vw,3.9rem)] sm:text-[clamp(2.3rem,4.6vw,3.9rem)]">
-            Find the best restaurants and hotels for your World Cup journey — and&nbsp;beyond.
+            Find the best restaurants and hotels for your World Cup journey, and&nbsp;beyond.
           </h1>
           <p className="mt-5 max-w-[52ch] animate-[fadeUp_0.8s_0.32s_both] motion-reduce:animate-none text-[14px] leading-relaxed text-gray-600 dark:text-gray-300 sm:mt-6 sm:text-[16px]">
             Never feel lost in a new city. Hodari understands exactly where you
             are, guides you with confidence, and helps you make the most of
-            every day — during the tournament and long after.
+            every day, during the tournament and long after.
           </p>
 
           <div className="mt-8 flex animate-[fadeUp_0.8s_0.46s_both] motion-reduce:animate-none flex-col gap-4 sm:mt-10 sm:flex-row sm:items-center sm:gap-5">
@@ -294,7 +294,7 @@ export default function HodariLanding() {
               From the trophy to the table
             </h2>
             <p className="mb-10 max-w-[58ch] px-5 text-[14px] leading-relaxed text-gray-600 dark:text-gray-400 sm:mb-12 sm:px-8 sm:text-[16px] lg:px-12">
-              The match is ninety minutes. The rest of the day is yours — Hodari
+              The match is ninety minutes. The rest of the day is yours. Hodari
               fills it with the right stadium route, the right table, and the
               right people.
             </p>

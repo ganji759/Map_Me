@@ -184,6 +184,21 @@ export function ChatPanel({
     }
   }, [streaming, caretVisible])
 
+  // After the stream ends, the last reply keeps typing out for a beat. Keep the
+  // view pinned to the bottom while it reveals — unless the user scrolled up.
+  useEffect(() => {
+    if (streaming) return
+    let raf = 0
+    let start = 0
+    const follow = (now: number) => {
+      if (!start) start = now
+      if (autoScrollRef.current) scrollToBottom('auto')
+      if (now - start < 2600) raf = requestAnimationFrame(follow)
+    }
+    raf = requestAnimationFrame(follow)
+    return () => cancelAnimationFrame(raf)
+  }, [streaming])
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const text = inputRef.current?.value.trim()
@@ -349,6 +364,7 @@ export function ChatPanel({
                         content={msg.content}
                         streaming={streaming && msg.id === lastMsgId}
                         showCaret={caretVisible && streaming && msg.id === lastMsgId}
+                        animate={msg.id === lastMsgId}
                       />
                     </div>
                   ) : (

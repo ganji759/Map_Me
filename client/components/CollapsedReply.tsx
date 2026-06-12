@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
@@ -8,6 +8,45 @@ import { ChevronDown } from 'lucide-react'
 
 const LONG_LINE_THRESHOLD = 8
 const PREVIEW_LINES = 4
+
+/**
+ * Reveals `target` left-to-right like a typewriter, independent of how the
+ * underlying text arrives (Gemini streams in large bursts, so without this the
+ * reply just pops in). The reveal decelerates as it catches up — fast when a
+ * big chunk lands, settling smoothly at the end — and keeps tracking the target
+ * as it grows mid-stream. Disabled (returns the full string) when not animating
+ * or when the user prefers reduced motion. No sound; purely visual.
+ */
+function useTypewriter(target: string, enabled: boolean): string {
+  const [count, setCount] = useState(enabled ? 0 : target.length)
+  const targetRef = useRef(target)
+  targetRef.current = target
+
+  useEffect(() => {
+    if (!enabled) {
+      setCount(target.length)
+      return
+    }
+    let raf = 0
+    const tick = () => {
+      setCount((prev) => {
+        const full = targetRef.current.length
+        if (prev >= full) return prev
+        const remaining = full - prev
+        // ~2 chars min per frame, faster the further behind we are.
+        const step = Math.max(2, Math.ceil(remaining / 22))
+        return Math.min(full, prev + step)
+      })
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled])
+
+  if (!enabled) return target
+  return target.slice(0, Math.min(count, target.length))
+}
 
 function lineCount(text: string): number {
   return text.split('\n').length
@@ -23,14 +62,23 @@ interface CollapsibleMessageProps {
   content: string
   streaming?: boolean
   showCaret?: boolean
+  /** Type this reply out left-to-right (the active/last assistant message). */
+  animate?: boolean
 }
 
 /** Long assistant replies — full text by default; collapse only past 8 lines. */
-export function CollapsibleMessage({ content, streaming = false, showCaret = false }: CollapsibleMessageProps) {
+export function CollapsibleMessage({ content, streaming = false, showCaret = false, animate = false }: CollapsibleMessageProps) {
   const reduced = useReducedMotion()
   const [expanded, setExpanded] = useState(true)
+
+  const revealed = useTypewriter(content, animate && !reduced)
+  const typing = revealed.length < content.length
+
   const long = lineCount(content) > LONG_LINE_THRESHOLD
-  const visible = !long || expanded ? content : previewText(content)
+  // While typing we always show the growing text (expanded); collapse only once
+  // the full reply has landed and settled.
+  const visible = !long || expanded || typing ? revealed : previewText(content)
+  const caret = showCaret || typing
 
   return (
     <div>
@@ -44,11 +92,11 @@ export function CollapsibleMessage({ content, streaming = false, showCaret = fal
         >
           <div className="prose-hodari w-full text-left text-[14px] leading-relaxed text-[var(--text-primary)]">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{visible}</ReactMarkdown>
-            {showCaret && <span className="stream-caret stream-caret-fade" aria-hidden />}
+            {caret && <span className="stream-caret stream-caret-fade" aria-hidden />}
           </div>
         </motion.div>
       </AnimatePresence>
-      {long && !streaming && (
+      {long && !streaming && !typing && (
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
@@ -98,7 +146,7 @@ export function CollapsedReply({ content, loading, streaming, onOpen, hideOpenCh
             <span className="text-[11px] tracking-wide text-gray-500">Thinking…</span>
           </div>
         ) : content ? (
-          <CollapsibleMessage content={content} streaming={streaming} showCaret={streaming} />
+          <CollapsibleMessage content={content} streaming={streaming} showCaret={streaming} animate={streaming} />
         ) : (
           <p className="text-[14px] leading-relaxed text-gray-500">
             Tap the mic and ask me anything — your reply shows up here.

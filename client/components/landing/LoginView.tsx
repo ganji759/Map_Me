@@ -17,7 +17,7 @@ import HeroMap from '@/components/landing/HeroMap'
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const VALUE_POINTS = [
-  { Icon: MapPin, text: 'Grounded by Google Maps — real places, never invented' },
+  { Icon: MapPin, text: 'Grounded by Google Maps, real places, never invented' },
   { Icon: Utensils, text: 'Restaurant-first plans built around your match days' },
   { Icon: Star, text: 'Learns your taste with every trip' },
 ]
@@ -115,7 +115,7 @@ export default function LoginView() {
           </h1>
           <p className="mt-5 max-w-[48ch] animate-[fadeUp_0.8s_0.32s_both] motion-reduce:animate-none text-[14px] leading-relaxed text-gray-600 dark:text-gray-300 sm:text-[15px]">
             Your taste, dietary needs and saved places live in your fan
-            profile, so every meal plan fits you — on match days and every day
+            profile, so every meal plan fits you, on match days and every day
             after.
           </p>
 
@@ -137,7 +137,7 @@ export default function LoginView() {
             Sign in to Hodari.
           </h2>
           <p className="mt-2 text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
-            No password needed — your fan profile follows your email.
+            No password needed. Your fan profile follows your email.
           </p>
 
           <form onSubmit={submit} className="mt-7 space-y-5">

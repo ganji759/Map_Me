@@ -6,7 +6,7 @@ const SLIDES = [
   { src: '/landing/restaurant.jpg', tag: 'The table', title: 'Dinner after the final whistle' },
   { src: '/landing/worldcup-fans.png', tag: 'The crew', title: 'Colours on, kickoff soon' },
   { src: '/landing/fans-bar.png', tag: 'The watch party', title: 'Every screen in the city' },
-  { src: '/landing/friends-toast.jpg', tag: 'The celebration', title: 'To the win — and the food' },
+  { src: '/landing/friends-toast.jpg', tag: 'The celebration', title: 'To the win, and the food' },
   { src: '/landing/friends-dinner.jpg', tag: 'The long table', title: 'New friends, one reservation' },
   { src: '/landing/friends-terrace.jpg', tag: 'The morning after', title: 'Brunch with a view' },
 ]
