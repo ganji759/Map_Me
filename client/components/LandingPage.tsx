@@ -127,7 +127,7 @@ export default function LandingPage() {
   const [uiMode, setUiMode] = useState<'chat' | 'voice'>('chat')
   const [chatWidth, setChatWidth] = useState(380)
   const resizingRef = useRef(false)
-  const [selectedModel, setSelectedModel] = useState<ModelId>('gemini-2.5-flash')
+  const [selectedModel, setSelectedModel] = useState<ModelId>('gemini-3.5')
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === 'undefined') return 'light'
     const saved = localStorage.getItem('hodari_theme')
@@ -154,11 +154,60 @@ export default function LandingPage() {
   const placesRef = useRef(places)
   const itineraryRef = useRef(itinerary)
   const activeStopRef = useRef(activeStop)
+  const fetchedPhotoIdsRef = useRef(new Set<string>())
+  const [savedPlaceIds, setSavedPlaceIds] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set()
+    try { return new Set(JSON.parse(localStorage.getItem('hodari_saved') ?? '[]')) } catch { return new Set() }
+  })
 
   useEffect(() => { placesRef.current = places }, [places])
   useEffect(() => { itineraryRef.current = itinerary }, [itinerary])
   useEffect(() => { activeStopRef.current = activeStop }, [activeStop])
   useEffect(() => { speakRepliesRef.current = speakReplies }, [speakReplies])
+
+  // Auto-fetch photos for places that came back without one
+  const placeIdsKey = places.map((p) => p.place_id).join(',')
+  useEffect(() => {
+    const toFetch = places.filter(
+      (p) => p.place_id && !p.place_id.startsWith('__') && !p.photo_url && !p.photos?.length && !fetchedPhotoIdsRef.current.has(p.place_id),
+    )
+    if (!toFetch.length) return
+    toFetch.forEach((place) => {
+      fetchedPhotoIdsRef.current.add(place.place_id)
+      fetch(`/api/place-photos?placeId=${encodeURIComponent(place.place_id)}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (!data?.photoUrls?.length) return
+          setPlaces((prev) =>
+            prev.map((p) =>
+              p.place_id === place.place_id ? { ...p, photo_url: data.photoUrls[0], photos: data.photoUrls } : p,
+            ),
+          )
+        })
+        .catch(() => {})
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placeIdsKey])
+
+  const handleSavePlace = useCallback(
+    (place: Place) => {
+      const id = place.place_id
+      const isNowSaved = !savedPlaceIds.has(id)
+      setSavedPlaceIds((prev) => {
+        const next = new Set(prev)
+        if (isNowSaved) next.add(id)
+        else next.delete(id)
+        try { localStorage.setItem('hodari_saved', JSON.stringify([...next])) } catch { /* ok */ }
+        return next
+      })
+      fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: USER_ID, placeId: id, placeName: place.name, city: place.city ?? '', action: isNowSaved ? 'saved' : 'unsaved' }),
+      }).catch(() => {})
+    },
+    [savedPlaceIds],
+  )
 
   const handleSend = useCallback(async (text: string, opts?: { speak?: boolean }) => {
     cancelSpeech()
@@ -553,6 +602,10 @@ export default function LandingPage() {
     setDetailsPlace(null)
   }, [historyItems])
 
+  const handleDeleteHistory = useCallback((id: string) => {
+    setHistoryItems((prev) => prev.filter((item) => item.id !== id))
+  }, [])
+
   const handleOpenMapFromMessage = useCallback((message: ChatMessage) => {
     if (message.itinerary?.stops?.length) {
       setItinerary(message.itinerary)
@@ -709,6 +762,7 @@ export default function LandingPage() {
       historyItems={historyItems}
       onNewChat={handleNewChat}
       onSelectHistory={handleSelectHistory}
+      onDeleteHistory={handleDeleteHistory}
       mapVisible={mapVisible && !mapExpanded}
       mapExpanded={mapExpanded}
       hasMapData={hasMapData}
@@ -840,6 +894,8 @@ export default function LandingPage() {
                   activeIndex={activeStop}
                   onSelect={handleMarkerClick}
                   onShowDetails={setDetailsPlace}
+                  onSave={handleSavePlace}
+                  savedIds={savedPlaceIds}
                 />
               )}
               {itineraryStops && itineraryStops.length > 0 && (
@@ -848,6 +904,8 @@ export default function LandingPage() {
                   activeIndex={activeStop}
                   onSelect={handleMarkerClick}
                   onShowDetails={(stop) => setDetailsPlace(stop)}
+                  onSave={handleSavePlace}
+                  savedIds={savedPlaceIds}
                 />
               )}
             </aside>

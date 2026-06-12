@@ -1,0 +1,63 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: hodari-frontend
+  annotations:
+    run.googleapis.com/launch-stage: BETA
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "3"
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      serviceAccountName: hodari-agent@mapsme-498314.iam.gserviceaccount.com
+      containers:
+      - name: hodari-frontend
+        image: us-central1-docker.pkg.dev/mapsme-498314/hodari/frontend@sha256:862c6985603db391950eb171cfb601c42b309ad2fcb6690a1123208c09fa67df
+        ports:
+        - containerPort: 3000
+        resources:
+          limits:
+            memory: 512Mi
+            cpu: "1"
+        env:
+        - name: ADK_BASE_URL
+          value: https://hodari-agent-377773225771.us-central1.run.app
+        - name: ADK_APP_NAME
+          value: hodari
+        - name: GOOGLE_GENAI_USE_VERTEXAI
+          value: "TRUE"
+        - name: GOOGLE_CLOUD_PROJECT
+          value: mapsme-498314
+        - name: GEMINI_VOICE_LOCATION
+          value: us-central1
+        - name: GOOGLE_MAPS_SERVER_KEY
+          valueFrom:
+            secretKeyRef:
+              name: GOOGLE_MAPS_API_KEY
+              key: latest
+        - name: MONGODB_MCP_URL
+          value: http://localhost:3100/mcp
+        - name: MONGODB_DATABASE
+          value: hodari
+        - name: MONGODB_URI
+          valueFrom:
+            secretKeyRef:
+              name: MONGODB_URI
+              key: latest
+
+      # ── MongoDB MCP sidecar (for login route) ─────────────────────────────
+      - name: mongodb-mcp
+        image: us-central1-docker.pkg.dev/mapsme-498314/hodari/mongodb-mcp@sha256:570008ed262c84c2d180195ad74b1971fe39314a65a4b949057e8c59527390bd
+        resources:
+          limits:
+            memory: 256Mi
+            cpu: "0.5"
+        env:
+        - name: MDB_MCP_CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              name: MONGODB_URI
+              key: latest

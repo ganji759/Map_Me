@@ -9,6 +9,7 @@ export interface Place {
   address: string
   coordinates: Coordinates
   categories: string[]
+  city?: string
   rating?: number
   price_level?: string
   summary?: string

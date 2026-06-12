@@ -1,0 +1,19 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    docker build \
+      --build-arg NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=$$MAPS_KEY \
+      -t us-central1-docker.pkg.dev/$PROJECT_ID/hodari/frontend:latest \
+      .
+  secretEnv: ['MAPS_KEY']
+
+images:
+- us-central1-docker.pkg.dev/$PROJECT_ID/hodari/frontend:latest
+
+availableSecrets:
+  secretManager:
+  - versionName: projects/$PROJECT_ID/secrets/NEXT_PUBLIC_GOOGLE_MAPS_API_KEY/versions/latest
+    env: 'MAPS_KEY'

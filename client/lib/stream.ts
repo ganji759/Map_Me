@@ -47,6 +47,12 @@ export async function* streamChat(
     signal,
   })
 
+  if (res.status === 429) {
+    const retryAfter = res.headers.get('Retry-After')
+    const wait = retryAfter ? ` Try again in ${retryAfter}s.` : ''
+    const msg = await res.json().then((d) => d?.error).catch(() => null)
+    throw new Error((msg ?? 'Too many requests. Please slow down.') + wait)
+  }
   if (!res.ok || !res.body) {
     throw new Error(`Chat request failed: ${res.status}`)
   }

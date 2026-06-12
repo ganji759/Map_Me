@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { ExternalLink, Star } from 'lucide-react'
+import { Bookmark, ExternalLink, Star } from 'lucide-react'
 import type { Place } from '@/lib/types'
 import { PlaceImage } from './PlaceImage'
 
@@ -10,6 +10,8 @@ interface Props {
   activeIndex: number | null
   onSelect: (index: number) => void
   onShowDetails: (place: Place) => void
+  onSave?: (place: Place) => void
+  savedIds?: Set<string>
 }
 
 function mapsLink(place: Place): string | null {
@@ -23,7 +25,7 @@ function mapsLink(place: Place): string | null {
   return null
 }
 
-export function PlaceListPanel({ places, activeIndex, onSelect, onShowDetails }: Props) {
+export function PlaceListPanel({ places, activeIndex, onSelect, onShowDetails, onSave, savedIds }: Props) {
   if (places.length === 0) return null
 
   return (
@@ -83,6 +85,16 @@ export function PlaceListPanel({ places, activeIndex, onSelect, onShowDetails }:
                     >
                       Details
                     </button>
+                    {onSave && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onSave(place) }}
+                        title={savedIds?.has(place.place_id) ? 'Remove from saved' : 'Save place'}
+                        className={`rounded-full p-1.5 transition-colors ${savedIds?.has(place.place_id) ? 'text-amber-600 hover:text-amber-700' : 'text-text3 hover:text-amber-500'}`}
+                      >
+                        <Bookmark className={`h-3.5 w-3.5 ${savedIds?.has(place.place_id) ? 'fill-current' : ''}`} />
+                      </button>
+                    )}
                     {href && (
                       <a
                         href={href}

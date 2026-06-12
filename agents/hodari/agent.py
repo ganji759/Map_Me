@@ -24,7 +24,7 @@ def _context_cache_config() -> ContextCacheConfig | None:
     return ContextCacheConfig(
         ttl_seconds=3600,   # 1 hour — agent instructions are stable
         cache_intervals=20, # reuse cache for 20 invocations before refresh
-        min_tokens=1024,    # skip caching for tiny requests
+        min_tokens=4096,    # Vertex AI minimum for context caching
     )
 
 # Planner → Explorer → Itinerary, guaranteed in order.

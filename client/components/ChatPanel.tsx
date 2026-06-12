@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
+  Bookmark,
   ChevronDown,
   History,
   Map as MapIcon,
@@ -16,6 +17,7 @@ import {
   Send,
   Square,
   Sun,
+  Trash2,
   Volume2,
   VolumeX,
 } from 'lucide-react'
@@ -46,6 +48,7 @@ interface Props {
   onSelectMapArchive?: (id: string) => void
   onNewChat: () => void
   onSelectHistory: (id: string) => void
+  onDeleteHistory?: (id: string) => void
   mapExpanded: boolean
   mapVisible: boolean
   hasMapData: boolean
@@ -90,6 +93,7 @@ export function ChatPanel({
   historyItems,
   onNewChat,
   onSelectHistory,
+  onDeleteHistory,
   mapArchive = [],
   onSelectMapArchive,
   hasMapData,
@@ -465,6 +469,14 @@ export function ChatPanel({
           >
             New chat
           </button>
+          <a
+            href="/saved"
+            onClick={() => setHistoryOpen(false)}
+            className="mt-2 flex w-full items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-[11px] uppercase tracking-wider text-[var(--text-primary)] transition-colors hover:border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20"
+          >
+            <Bookmark className="h-3.5 w-3.5 shrink-0" />
+            Saved places
+          </a>
           {mapArchive.length > 0 && (
             <div className="mt-5 border-t border-[var(--border)] pt-4">
               <p className="mb-2 flex items-center gap-1.5 px-1 text-[10px] font-medium uppercase tracking-wider text-amber-600">
@@ -492,17 +504,28 @@ export function ChatPanel({
               <p className="px-1 text-[13px] text-[var(--text-secondary)]">No recent chats yet.</p>
             ) : (
               visibleHistoryItems.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => { onSelectHistory(item.id); setHistoryOpen(false) }}
-                  className="w-full rounded-lg px-2 py-2 text-left hover:bg-amber-50 dark:text-gray-300 dark:hover:bg-amber-900/10"
-                >
-                  <span className="block truncate text-[13px] text-[var(--text-primary)] dark:text-gray-300">{item.title}</span>
-                  <span className="mt-0.5 block text-[11px] text-[var(--text-secondary)] dark:text-gray-500">
-                    {new Date(item.updatedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </button>
+                <div key={item.id} className="group relative">
+                  <button
+                    type="button"
+                    onClick={() => { onSelectHistory(item.id); setHistoryOpen(false) }}
+                    className="w-full rounded-lg px-2 py-2 pr-8 text-left hover:bg-amber-50 dark:text-gray-300 dark:hover:bg-amber-900/10"
+                  >
+                    <span className="block truncate text-[13px] text-[var(--text-primary)] dark:text-gray-300">{item.title}</span>
+                    <span className="mt-0.5 block text-[11px] text-[var(--text-secondary)] dark:text-gray-500">
+                      {new Date(item.updatedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </button>
+                  {onDeleteHistory && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onDeleteHistory(item.id) }}
+                      aria-label="Delete chat"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--text-secondary)] opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
               ))
             )}
           </div>

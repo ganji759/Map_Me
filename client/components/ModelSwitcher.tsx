@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 
-export type ModelId = 'gemini-2.5-flash' | 'gpt-4o' | 'claude-opus-4'
+export type ModelId = 'gemini-3.5' | 'gpt-4o' | 'claude-opus-4'
 
 export interface ModelConfig {
   id: ModelId
@@ -16,8 +16,8 @@ export interface ModelConfig {
 
 export const MODELS: ModelConfig[] = [
   {
-    id: 'gemini-2.5-flash',
-    name: 'Gemini 2.5 Flash',
+    id: 'gemini-3.5',
+    name: 'Gemini 3.5',
     provider: 'Google',
     tag: 'Active',
     color: '#4285F4',

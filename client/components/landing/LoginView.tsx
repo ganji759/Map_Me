@@ -96,16 +96,9 @@ export default function LoginView() {
       {/* Sign-in card */}
       <div className="relative z-20 flex flex-1 items-center justify-center px-5 pb-10">
         <div className="w-full max-w-[440px] rounded-3xl bg-white p-7 shadow-[0_24px_80px_rgba(0,0,0,0.16)] dark:bg-[#131318] dark:shadow-[0_24px_80px_rgba(0,0,0,0.65)] sm:p-10">
-          <p className="mb-5 text-[13px] tracking-wide text-gray-600 dark:text-gray-400 sm:mb-7 sm:text-[14px]">
-            Hodari, your AI companion for World Cup days
-          </p>
           <h1 className="font-display font-semibold leading-[1.12] tracking-[-0.01em] text-gray-900 dark:text-gray-50 text-[clamp(1.6rem,5vw,2.3rem)]">
             Sign in to Hodari.
           </h1>
-          <p className="mt-4 text-[14px] leading-[1.6] text-gray-600 dark:text-gray-400">
-            Your taste, dietary needs and saved places live in your fan profile,
-            so every meal plan fits you. New here? We&apos;ll create one automatically.
-          </p>
 
           <form onSubmit={submit} className="mt-8 space-y-5">
             <div>
@@ -163,10 +156,6 @@ export default function LoginView() {
             </button>
           </form>
 
-          <p className="mt-6 text-[12px] leading-[1.6] text-gray-400 dark:text-gray-600">
-            No passwords during the tournament. Your name and email only load your
-            saved preferences.
-          </p>
         </div>
       </div>
     </div>

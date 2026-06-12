@@ -1,0 +1,74 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: hodari-agent
+  annotations:
+    run.googleapis.com/launch-stage: BETA
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "5"
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      serviceAccountName: hodari-agent@mapsme-498314.iam.gserviceaccount.com
+      containers:
+      # ── Main serving container ────────────────────────────────────────────
+      - name: hodari-agent
+        image: us-central1-docker.pkg.dev/mapsme-498314/hodari/agent@sha256:e776a56180d633f80e47cbb1975942009287c31cc4f6d2770ae6a0275a78802f
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            memory: 2Gi
+            cpu: "2"
+        env:
+        - name: AGENT_SERVICE
+          value: hodari
+        - name: GOOGLE_GENAI_USE_VERTEXAI
+          value: "TRUE"
+        - name: GOOGLE_CLOUD_PROJECT
+          value: mapsme-498314
+        - name: GOOGLE_CLOUD_LOCATION
+          value: global
+        - name: GEMINI_MODEL
+          value: gemini-3.5-flash
+        - name: MONGODB_DATABASE
+          value: hodari
+        - name: MONGODB_MCP_URL
+          value: http://localhost:3100/mcp
+        - name: HODARI_PROFILING
+          value: "0"
+        - name: HODARI_CONTEXT_CACHE
+          value: "1"
+        - name: GOOGLE_MAPS_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: GOOGLE_MAPS_API_KEY
+              key: latest
+        - name: MONGODB_URI
+          valueFrom:
+            secretKeyRef:
+              name: MONGODB_URI
+              key: latest
+        startupProbe:
+          tcpSocket:
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 12
+
+      # ── MongoDB MCP sidecar (localhost:3100) ──────────────────────────────
+      - name: mongodb-mcp
+        image: us-central1-docker.pkg.dev/mapsme-498314/hodari/mongodb-mcp@sha256:570008ed262c84c2d180195ad74b1971fe39314a65a4b949057e8c59527390bd
+        resources:
+          limits:
+            memory: 256Mi
+            cpu: "0.5"
+        env:
+        - name: MDB_MCP_CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              name: MONGODB_URI
+              key: latest

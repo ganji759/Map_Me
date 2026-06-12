@@ -48,4 +48,4 @@ ENV AGENT_SERVICE=orchestrator
 # Use sh -c so ${AGENT_SERVICE} and ${PORT} expand at container start time.
 # Passing services/${AGENT_SERVICE} tells ADK to load that specific package's
 # root_agent (e.g. services/planner/__init__.py).
-CMD ["sh", "-c", "python -m google.adk.cli api_server services/${AGENT_SERVICE} --port ${PORT} --host 0.0.0.0"]
+CMD ["sh", "-c", "adk api_server ${AGENT_SERVICE} --port ${PORT} --host 0.0.0.0"]

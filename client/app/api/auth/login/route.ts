@@ -178,9 +178,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ user: publicUser(doc), isNew: true })
   } catch (err) {
     console.error('[auth/login]', err)
-    const detail = err instanceof Error && /connect to a MongoDB/i.test(err.message)
-      ? 'The profile database is not connected. Start the MongoDB MCP server on port 3100 with your connection string (MDB_MCP_CONNECTION_STRING).'
-      : 'Could not reach the profile database. Is the MongoDB MCP server running on port 3100?'
+    const detail = 'Sign-in is temporarily unavailable. Please try again in a moment.'
     return NextResponse.json({ error: detail }, { status: 502 })
   }
 }
