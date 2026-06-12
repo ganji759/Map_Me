@@ -19,6 +19,35 @@ async function mcpSession(): Promise<string> {
   return sid
 }
 
+/**
+ * Extract a document array from an MCP tool result. The MongoDB MCP `find`
+ * tool returns rows as text wrapped in <untrusted-user-data-…> security tags
+ * (NOT raw JSON), and some builds use `structuredContent` instead — handle all
+ * shapes, mirroring the agent-side parser in agents/hodari/tools/mongo_tools.py.
+ */
+function extractDocs(result: {
+  content?: Array<{ type: string; text?: string }>
+  structuredContent?: unknown
+}): unknown[] {
+  const sc = result.structuredContent
+  if (Array.isArray(sc)) return sc
+  if (sc && typeof sc === 'object' && Array.isArray((sc as { documents?: unknown }).documents)) {
+    return (sc as { documents: unknown[] }).documents
+  }
+  for (const c of result.content ?? []) {
+    if (c.type !== 'text' || !c.text) continue
+    // Pure JSON array?
+    try { const p = JSON.parse(c.text); if (Array.isArray(p)) return p } catch { /* ok */ }
+    // JSON array embedded in one or more <untrusted-user-data-…>…</…> blocks.
+    const blocks = c.text.match(/<untrusted-user-data-[^>]+>([\s\S]*?)<\/untrusted-user-data-[^>]+>/g) ?? []
+    for (const block of blocks) {
+      const inner = block.replace(/<untrusted-user-data-[^>]+>/, '').replace(/<\/untrusted-user-data-[^>]+>/, '').trim()
+      try { const p = JSON.parse(inner); if (Array.isArray(p)) return p } catch { /* ok */ }
+    }
+  }
+  return []
+}
+
 async function mcpCall(sid: string, name: string, args: Record<string, unknown>): Promise<unknown[]> {
   const res = await fetch(MCP_URL, {
     method: 'POST',
@@ -31,13 +60,12 @@ async function mcpCall(sid: string, name: string, args: Record<string, unknown>)
     : [body]
   for (const payload of payloads) {
     try {
-      const msg = JSON.parse(payload) as { result?: { content?: Array<{ type: string; text?: string }> } }
-      if (msg.result?.content) {
-        for (const c of msg.result.content) {
-          if (c.type === 'text' && c.text) {
-            try { const parsed = JSON.parse(c.text); if (Array.isArray(parsed)) return parsed } catch { /* ok */ }
-          }
-        }
+      const msg = JSON.parse(payload) as {
+        result?: { content?: Array<{ type: string; text?: string }>; structuredContent?: unknown }
+      }
+      if (msg.result) {
+        const docs = extractDocs(msg.result)
+        if (docs.length) return docs
       }
     } catch { /* ok */ }
   }

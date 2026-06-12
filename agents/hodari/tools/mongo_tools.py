@@ -183,10 +183,28 @@ def _embed(text: str) -> list[float]:
 # ── ADK tool helpers ─────────────────────────────────────────────────────────
 
 def _user_id(tool_context: ToolContext) -> str:
-    try:
-        return tool_context.invocation_context.session.user_id
-    except AttributeError:
-        pass
+    """Resolve the end-user id for the current invocation.
+
+    ADK exposes the live session via the public `session` property
+    (`tool_context.session.user_id`). Older builds nested it under
+    `invocation_context`; try both, then any value stashed in state, before
+    giving up. Returning the right id is critical: it is the partition key for
+    saved places and personalization, so a wrong default silently writes every
+    user's data under "anonymous".
+    """
+    for getter in (
+        lambda: tool_context.session.user_id,
+        lambda: tool_context.invocation_context.session.user_id,
+        lambda: tool_context._invocation_context.session.user_id,
+    ):
+        try:
+            uid = getter()
+            if uid:
+                return uid
+        except AttributeError:
+            continue
+        except Exception:
+            continue
     try:
         return tool_context.state.get("_user_id", "anonymous")
     except Exception:
@@ -333,6 +351,113 @@ def save_preference(
     except Exception as exc:
         logger.warning("save_preference failed: %s", exc)
         return "Preference not saved (non-critical)."
+
+
+def _resolve_place(
+    tool_context: ToolContext,
+    place_name: str,
+    place_id: str,
+) -> tuple[str, str, str]:
+    """Resolve a place_id / name / city from the current session results.
+
+    Looks in the candidates the pipeline last produced (and any itinerary
+    stops) so the user can say "save Carmine's" or "save the first one" and we
+    persist the same Google Place ID the map and Saved page use. Falls back to
+    whatever the caller passed when there is no match.
+    """
+    items: list[dict[str, Any]] = []
+    raw = tool_context.state.get("candidates") or ""
+    try:
+        parsed = json.loads(raw) if isinstance(raw, str) else raw
+        if isinstance(parsed, list):
+            items = parsed
+    except (json.JSONDecodeError, TypeError):
+        items = []
+    items = items + parse_itinerary_stops(tool_context.state.get("itinerary"))
+
+    name_l = (place_name or "").strip().lower()
+    for it in items:
+        pid = it.get("place_id") or ""
+        nm = it.get("name") or it.get("place_name") or ""
+        city = it.get("city") or _city_from_address(it.get("address", ""))
+        if place_id and pid == place_id:
+            return pid, nm or place_name, city
+        if name_l and (name_l in nm.lower() or nm.lower() in name_l):
+            return pid, nm, city
+    return place_id or "", place_name or "", ""
+
+
+def save_place(
+    place_name: str,
+    tool_context: ToolContext,
+    place_id: str = "",
+    city: str = "",
+) -> str:
+    """Save (bookmark) a place to the user's Saved Places list.
+
+    Call this whenever the user asks to save, bookmark, or keep a place from the
+    results you just showed (e.g. "save Carmine's", "bookmark the first one",
+    "add that to my saved places"). The place then appears on the in-app Saved
+    Places page. Never tell the user a place was saved unless this tool returned
+    success.
+
+    Args:
+        place_name: Name of the place to save, as shown to the user.
+        place_id:   Google Place ID if known (optional; resolved from results otherwise).
+        city:       City of the place (optional; resolved from results otherwise).
+        tool_context: Injected by ADK.
+    """
+    uid = _user_id(tool_context)
+    pid, name, resolved_city = _resolve_place(tool_context, place_name, place_id)
+    city = city or resolved_city
+    if not pid:
+        return (
+            f"I couldn't find {place_name or 'that place'} in the current results to save. "
+            "Ask me to find some places first, then I can save one for you."
+        )
+    try:
+        _persist_preference_sync(uid, pid, name or place_name, city, "saved")
+        return f"Saved {name or place_name} to your Saved Places."
+    except Exception as exc:
+        logger.warning("save_place failed: %s", exc)
+        return "I couldn't save that just now. Please try again in a moment."
+
+
+def list_saved_places(tool_context: ToolContext) -> list[dict]:
+    """List the places the user has saved (their Saved Places page contents).
+
+    Call this when the user asks what they've saved, what's on their list, or
+    what they planned to visit. Returns place names, cities, and any planned
+    visit date. Returns an empty list if they have saved nothing yet.
+
+    Args:
+        tool_context: Injected by ADK.
+    """
+    uid = _user_id(tool_context)
+    try:
+        result = _mcp_tool("find", {
+            "database": HODARI_DB,
+            "collection": "interactions",
+            "filter": {"user_id": uid, "action": {"$in": ["saved", "reminder"]}},
+            "limit": 50,
+        })
+        docs = _parse_docs(result)
+        seen: set[str] = set()
+        out: list[dict] = []
+        for d in docs:
+            pid = d.get("place_id") or d.get("place_name")
+            if pid in seen:
+                continue
+            seen.add(pid)
+            out.append({
+                "place_name": d.get("place_name", ""),
+                "city": d.get("city", ""),
+                "visit_date": d.get("visit_date"),
+            })
+        return out
+    except Exception as exc:
+        logger.info("list_saved_places failed: %s", exc)
+        return []
 
 
 def find_similar_preferences(

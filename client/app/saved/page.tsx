@@ -92,7 +92,7 @@ export default function SavedPage() {
     <div className="flex min-h-screen flex-col bg-[#ffffff] dark:bg-[#15151a]">
       {/* Header */}
       <header className="flex items-center gap-4 border-b border-amber-100/60 bg-[#ffffff]/95 px-5 py-4 backdrop-blur-sm dark:border-amber-900/30 dark:bg-[#15151a]/95">
-        <Link href="/" className="flex items-center gap-2 rounded-lg p-1.5 text-amber-700 transition-colors hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/30">
+        <Link href="/chat" aria-label="Back to chat" className="flex items-center gap-2 rounded-lg p-1.5 text-amber-700 transition-colors hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/30">
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <div>
@@ -143,7 +143,7 @@ export default function SavedPage() {
                 <p className="mt-1.5 text-[13px] text-amber-600/70 dark:text-amber-500/70">
                   Tap the bookmark icon on any place card to save it here.
                 </p>
-                <Link href="/" className="mt-4 inline-block rounded-full bg-amber-600 px-6 py-2 text-[13px] font-medium text-white transition-colors hover:bg-amber-700">
+                <Link href="/chat" className="mt-4 inline-block rounded-full bg-amber-600 px-6 py-2 text-[13px] font-medium text-white transition-colors hover:bg-amber-700">
                   Explore places
                 </Link>
               </div>
@@ -196,7 +196,7 @@ export default function SavedPage() {
                             {isEditing ? 'Cancel' : reminder?.visit_date ? 'Edit visit' : 'Plan visit'}
                           </button>
                           <Link
-                            href="/"
+                            href="/chat"
                             className="rounded-full border border-amber-200 px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-amber-700 transition-colors hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/20"
                           >
                             Ask Hodari

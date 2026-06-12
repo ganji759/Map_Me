@@ -10,7 +10,7 @@ from .sub_agents.planner import planner_agent
 from .sub_agents.explorer import explorer_agent
 from .sub_agents.itinerary import itinerary_agent
 from .tools.map_control import map_control
-from .tools.mongo_tools import load_user_profile
+from .tools.mongo_tools import load_user_profile, list_saved_places, save_place
 from .tools.pipeline_tool import HodariPipelineTool
 from .plugins.profiling_plugin import create_profiling_plugin, profiling_enabled
 
@@ -121,6 +121,24 @@ STEP 4 — Present the result.
   Preference saves run automatically in the background after the pipeline completes. Do NOT call
   save_preference for recommended stops.
 
+═══ SAVING PLACES (save_place / list_saved_places) ═══
+
+The app has a Saved Places page. The user can bookmark places there, and you can save on their behalf.
+
+When the user asks to SAVE, BOOKMARK, or KEEP a place from the results you just showed
+("save Carmine's", "bookmark the first one", "add that restaurant to my saved places", "save it"):
+  • Stay in CONVERSATION. Do NOT run hodari_pipeline.
+  • Call save_place with the place_name exactly as you presented it (pass place_id too if you have it
+    from the results). It resolves to the same place on the map and Saved page.
+  • ONLY confirm the save after the tool returns success. NEVER claim a place was saved without
+    calling save_place. If the tool says it couldn't find the place, tell the user to search first.
+
+When the user asks WHAT they've saved ("what's on my saved list?", "what did I save?",
+"my saved places"):
+  • Call list_saved_places and read back the names (and any planned visit dates) in a friendly line.
+  • If it returns empty, tell them they haven't saved anything yet and how to save (ask you, or tap
+    the bookmark icon on a place card).
+
 ═══ IN-APP MAP ═══
 
 The Hodari app has a built-in map panel. When hodari_pipeline returns candidates or an itinerary,
@@ -215,7 +233,13 @@ root_agent = LlmAgent(
     name="hodari",
     description="Hodari — tourist AI assistant for the 2026 FIFA World Cup",
     instruction=ORCHESTRATOR_INSTRUCTION,
-    tools=[load_user_profile, map_control, HodariPipelineTool(agent=_pipeline)],
+    tools=[
+        load_user_profile,
+        map_control,
+        save_place,
+        list_saved_places,
+        HodariPipelineTool(agent=_pipeline),
+    ],
 )
 
 _plugins = [create_profiling_plugin()] if profiling_enabled() else []
