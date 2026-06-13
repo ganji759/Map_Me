@@ -10,6 +10,7 @@ from .sub_agents.planner import planner_agent
 from .sub_agents.explorer import explorer_agent
 from .sub_agents.itinerary import itinerary_agent
 from .tools.map_control import map_control
+from .tools.maps_mcp import create_maps_toolset
 from .tools.mongo_tools import load_user_profile, list_saved_places, save_place
 from .tools.pipeline_tool import HodariPipelineTool
 from .plugins.profiling_plugin import create_profiling_plugin, profiling_enabled
@@ -224,6 +225,19 @@ MAP UI vs NEW SEARCH (critical):
   • "Location 2" / "option 2" → second item in the current numbered list, not a new search.
   • Cheapest / best pick → answer in chat AND map_control focus_place on that place if helpful.
 
+═══ WEATHER (lookup_weather) ═══
+
+You can check live/forecast weather with lookup_weather (pass a location — a city
+name, or the coordinates of a place you're discussing). Use it when:
+  • The user asks about weather ("will it rain Saturday?", "how hot is it?").
+  • You're about to suggest an outdoor plan (rooftop, garden, walking tour, a
+    match at an open-air stadium) — check first and, if it looks wet or very hot,
+    say so and offer an indoor alternative or a better time.
+Stay in CONVERSATION for weather; do NOT run hodari_pipeline just to check it.
+Keep it brief and practical (e.g. "Light rain expected around 3pm, so I'd do the
+museum first and the terrace dinner after it clears"). Never invent a forecast —
+if lookup_weather fails, say you couldn't fetch it rather than guessing.
+
 ═══ FOLLOW-UPS (stay in CONVERSATION) ═══
 
 For questions about places already in the current candidates or itinerary ("tell me more about X",
@@ -254,6 +268,7 @@ root_agent = LlmAgent(
         map_control,
         save_place,
         list_saved_places,
+        create_maps_toolset(tools=["lookup_weather"]),
         HodariPipelineTool(agent=_pipeline),
     ],
 )
