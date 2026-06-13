@@ -61,7 +61,7 @@ the `route` map action and the agent instruction.
 `tools/map_control.py`, `agent.py`. Needs Directions API enabled on the key.
 **Effort:** M–L.
 
-## Phase 6 — Deeper taste personalization  ☐
+## Phase 6 — Deeper taste personalization  ☑ (shipped 2026-06-13)
 **Why:** `find_similar_preferences` (vector) exists but is shallow; saves are now
 reliable, so the signal is good.
 **How:** Surface "because you liked X" rationale; rerank candidates by the user's
@@ -69,7 +69,11 @@ saved/liked history more aggressively; let the agent reference the saved list.
 **Files:** `sub_agents/explorer.py`, `tools/mongo_tools.py`, presenter instruction.
 **Effort:** M.
 
-## Phase 7 — Map clustering + "walk radius from the stadium"  ☐
+## Phase 7 — "Walk radius from the stadium" (+ clustering deferred)  ☑ (shipped 2026-06-13)
+Shipped the walk-radius: circle_place now takes `minutes` (≈80 m/min) and explicit
+lat/lng (+label) so the AI can draw a "10-min walk around MetLife" using
+world_cup_venues coordinates. Marker clustering deferred — low value at the
+current 5–10 pins per result.
 **Why:** Builds on the new annotation layer; clearer dense maps + match-day radius.
 **How:** Marker clustering for many pins; a one-call "circle N-minute walk around
 venue" annotation.

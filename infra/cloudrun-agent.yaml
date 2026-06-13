@@ -16,7 +16,7 @@ spec:
       containers:
       # ── Main serving container ────────────────────────────────────────────
       - name: hodari-agent
-        image: us-central1-docker.pkg.dev/mapsme-498314/hodari/agent@sha256:9d5c9ca6dd8fd2540a80bbdec66fc4da1eccfc68840cd3a64dc0ac080c85e03b
+        image: us-central1-docker.pkg.dev/mapsme-498314/hodari/agent@sha256:f7070e81066ea1c4538812000a55ebcef2816adee5477a70632d39cf774ff981
         ports:
         - containerPort: 8080
         resources:

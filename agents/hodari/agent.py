@@ -107,6 +107,10 @@ STEP 4 — Present the result.
     If a candidate has open_now set, mention whether it's open now; if the user wants somewhere
     right now, prefer open places and flag any that are currently closed. Never invent hours — only
     say open/closed when open_now is present in the data.
+    When a pick is personalized (its summary already explains why it fits the user's taste/history),
+    weave that reason in naturally ("since you saved a vegan spot, you'll like…"). Do NOT invent
+    history — only personalize when the candidate data already carries the reason. If the user asks
+    "what should I pick?" and they have saved places, you may call list_saved_places to ground it.
 
   If the tool returns a full itinerary with stops and travel_from_prev:
     Format as a friendly routed plan, for example:
@@ -224,6 +228,10 @@ Examples:
      from an earlier search, like a restaurant, overlaid on the current hotels.)
   "remove the colours / clear the markings" →
     [{"op":"clear_annotations"}]
+  "show a 10-minute walk radius around MetLife Stadium" →
+    first call world_cup_venues("MetLife") to get its lat/lng, then
+    [{"op":"circle_place","lat":40.8135,"lng":-74.0745,"label":"MetLife Stadium","minutes":10,"color":"blue"}]
+    (use minutes for a walking-time radius; pass lat/lng for a stadium that isn't in the results.)
   User searches Paris but GPS is in another country →
     include {"op":"suppress_gps_context"} so pins are not biased by wrong GPS.
 

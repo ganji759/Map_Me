@@ -19,7 +19,7 @@ export type MapAction =
   | { op: 'route'; from: 'user' | 'landmark'; landmark?: string; to_place_index?: number; to_place_name?: string; mode?: TravelMode }
   | { op: 'suppress_gps_context' }
   | { op: 'highlight_place'; place_index?: number; place_name?: string; color?: string }
-  | { op: 'circle_place'; place_index?: number; place_name?: string; color?: string; radius_m?: number }
+  | { op: 'circle_place'; place_index?: number; place_name?: string; color?: string; radius_m?: number; minutes?: number; lat?: number; lng?: number; label?: string }
   | { op: 'clear_annotations' }
 
 // ── Map annotations (AI-drawn colors / circles / extra markers) ──────────────
@@ -465,11 +465,29 @@ export function applyAnnotationActions(
     }
     if (action.op !== 'highlight_place' && action.op !== 'circle_place') continue
 
-    const place = resolve(action)
-    if (!place || !isValidCoord(place.coordinates)) continue
     const color = normalizeAnnotationColor(action.color)
-    const inList = list.some((x) => x.place_id === place.place_id)
 
+    // circle_place may target an explicit lat/lng (e.g. a stadium from
+    // world_cup_venues that isn't in the results) — synthesize a place for it.
+    let place = resolve(action)
+    if (
+      !place &&
+      action.op === 'circle_place' &&
+      typeof action.lat === 'number' &&
+      typeof action.lng === 'number'
+    ) {
+      const coordinates = { lat: action.lat, lng: action.lng }
+      place = {
+        place_id: `pin:${action.lat.toFixed(5)},${action.lng.toFixed(5)}`,
+        name: action.label || 'Marked location',
+        address: '',
+        coordinates,
+        categories: [],
+      }
+    }
+    if (!place || !isValidCoord(place.coordinates)) continue
+
+    const inList = list.some((x) => x.place_id === place!.place_id)
     next = {
       ...next,
       colors: { ...next.colors, [place.place_id]: color },
@@ -479,10 +497,13 @@ export function applyAnnotationActions(
     }
 
     if (action.op === 'circle_place') {
+      // Prefer minutes (walk radius ≈ 80 m/min); else explicit radius_m; else 350 m.
       const radiusM =
-        typeof action.radius_m === 'number' && action.radius_m > 0
-          ? Math.min(action.radius_m, 5000)
-          : 350
+        typeof action.minutes === 'number' && action.minutes > 0
+          ? Math.min(action.minutes * 80, 8000)
+          : typeof action.radius_m === 'number' && action.radius_m > 0
+            ? Math.min(action.radius_m, 8000)
+            : 350
       next = {
         ...next,
         circles: upsertById(next.circles, { id: place.place_id, center: place.coordinates, radiusM, color }),

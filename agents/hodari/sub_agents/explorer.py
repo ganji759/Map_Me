@@ -34,9 +34,13 @@ STEPS (follow in order):
    - Local vector results (step 2) come first — they are already reliable and well-described.
    - Maps results (step 3) fill gaps and add recency.
    - Apply personalisation from step 1:
-       • Boost places whose categories match past liked/visited interactions.
+       • Boost places whose categories match past liked/visited/saved interactions.
        • Slightly lower score for categories the user previously skipped/disliked.
        • Set personalization_score between 0.0 (no match) and 1.0 (strong match).
+       • For any candidate with a real match, append a short WHY to its summary,
+         grounded in the actual history (e.g. "like the vegan spot you saved",
+         "matches your taste for Italian"). Never fabricate a reason — only when
+         find_similar_preferences actually returned a related signal.
    - Deduplicate by name similarity — if a local result and a Maps result refer to the
      same venue, keep the one with more detail (usually the local result).
 

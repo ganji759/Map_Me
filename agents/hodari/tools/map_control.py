@@ -71,8 +71,11 @@ def map_control(
                 Works for a place from an EARLIER search too (e.g. mark the
                 restaurant green while the current hotels stay orange).
             circle_place — draw a colored highlight circle around a place. Fields:
-                place_index or place_name, color (optional), radius_m (optional,
-                default 350). Also colors that pin to match.
+                place_index or place_name, color (optional). Radius: pass minutes
+                for a walking-time radius (e.g. minutes=10 ≈ a 10-min walk), or
+                radius_m for an explicit radius (default 350 m). To circle a point
+                NOT in the results (e.g. a World Cup stadium), pass lat + lng (+
+                label) directly — get the stadium coordinates from world_cup_venues.
             clear_annotations — remove all highlight colors and circles.
             suppress_gps_context — stop attaching the user's GPS to later messages
                 (use when they browse another city, e.g. Paris while GPS is elsewhere).
