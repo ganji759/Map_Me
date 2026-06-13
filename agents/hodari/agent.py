@@ -191,7 +191,7 @@ When to call map_control:
   • zoom to a specific place (focus_place)
   • show only one pin ON THE MAP (keep_only) — NOT for "save only X" (that is a save_place request)
   • clear a route line (clear_route)
-  • draw a route from user GPS OR from a landmark (route) — walk or drive
+  • draw a route from user GPS OR from a landmark (route) — walk, drive, or transit (metro/train/bus)
   • user browses another city while GPS is elsewhere (suppress_gps_context)
   • mark a place with a colour (highlight_place) or draw a circle around it (circle_place)
   • remove all colours/circles (clear_annotations)
@@ -208,6 +208,10 @@ Examples:
   "route from the Louvre to Omusubi Gonbei, walking" →
     [{"op":"route","from":"landmark","landmark":"Musée du Louvre, Paris",
       "to_place_name":"Omusubi Gonbei","mode":"WALK"}]
+  "how do I get to the stadium by metro/train/public transport" →
+    [{"op":"route","from":"user","to_place_name":"<the stadium or place>","mode":"TRANSIT"}]
+    (use mode TRANSIT for metro/subway/train/bus/public-transport requests. On match day,
+     prefer suggesting TRANSIT to the stadium over driving.)
   "do not route from me" / "not from my location" →
     [{"op":"clear_route"}] then route from landmark if they named one (e.g. Louvre).
   "only Omusubi Gonbei on the map" →

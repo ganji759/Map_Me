@@ -49,7 +49,9 @@ the agent to anchor plans to match day (arrive-by, pre/post-match meal near venu
 **Files:** new `tools/fixtures.py` (+ venue data), `agent.py`, Explorer location bias.
 **Effort:** M.
 
-## Phase 5 — Transit / public-transport directions to stadiums  ☐
+## Phase 5 — Transit / public-transport directions to stadiums  ☑ (shipped 2026-06-13)
+Needs Directions API enabled on the Maps key for live transit routes; falls back
+to driving/walking where transit data is unavailable.
 **Why:** On match day people take the metro/train, not a car. Routing is WALK/DRIVE only.
 **How:** Add a TRANSIT travel mode. Grounding Lite `compute_routes` may not do
 transit, so use the Google Directions API (transit mode) in the client route

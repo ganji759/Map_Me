@@ -778,10 +778,17 @@ function OriginToPlaceRoute({
     rendererRef.current = renderer
 
     const directionsService = new google.maps.DirectionsService()
-    const travelMode =
-      mode === 'DRIVE' ? google.maps.TravelMode.DRIVING : google.maps.TravelMode.WALKING
-    const altMode =
-      mode === 'DRIVE' ? google.maps.TravelMode.WALKING : google.maps.TravelMode.DRIVING
+    const TM = google.maps.TravelMode
+    const modeMap: Record<TravelMode, google.maps.TravelMode> = {
+      DRIVE: TM.DRIVING,
+      WALK: TM.WALKING,
+      BICYCLE: TM.BICYCLING,
+      TRANSIT: TM.TRANSIT,
+    }
+    const travelMode = modeMap[mode] ?? TM.WALKING
+    // If the primary mode finds no route (e.g. no transit data for the area),
+    // fall back to driving (or walking when driving was primary).
+    const altMode = travelMode === TM.DRIVING ? TM.WALKING : TM.DRIVING
 
     function finishError(primary: string, fallback?: string) {
       onRouteError?.(

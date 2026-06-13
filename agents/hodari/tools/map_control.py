@@ -63,7 +63,8 @@ def map_control(
                 from: "user" or "landmark"
                 landmark: required when from is "landmark" (e.g. "Musée du Louvre, Paris")
                 to_place_index or to_place_name: destination from current candidates/itinerary
-                mode: "WALK" or "DRIVE" (default WALK)
+                mode: "WALK", "DRIVE", "TRANSIT", or "BICYCLE" (default WALK).
+                    Use TRANSIT for "by metro/train/bus/public transport".
             highlight_place — mark a place with a distinct colored pin (keeps the
                 other pins as they are). Fields: place_index or place_name, and
                 color (one of: green, red, blue, purple, black, yellow, pink).

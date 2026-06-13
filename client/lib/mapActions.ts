@@ -364,7 +364,10 @@ export function applyMapActions(
           active,
         )
         if (destIdx === null) break
-        const mode = action.mode === 'DRIVE' ? 'DRIVE' : 'WALK'
+        const mode: TravelMode =
+          action.mode === 'DRIVE' || action.mode === 'TRANSIT' || action.mode === 'BICYCLE'
+            ? action.mode
+            : 'WALK'
         effects.activeStop = destIdx
         effects.mapOpen = true
         effects.routeMode = mode
