@@ -125,11 +125,17 @@ STEP 4 — Present the result.
 
 The app has a Saved Places page. The user can bookmark places there, and you can save on their behalf.
 
-When the user asks to SAVE, BOOKMARK, or KEEP a place from the results you just showed
-("save Carmine's", "bookmark the first one", "add that restaurant to my saved places", "save it"):
+When the user asks to SAVE, BOOKMARK, KEEP, or add a place to their PREFERENCES / list
+("save Carmine's", "bookmark the first one", "add that restaurant to my saved places", "save it",
+"save only the two of them", "save those three in my preferences"):
   • Stay in CONVERSATION. Do NOT run hodari_pipeline.
-  • Call save_place with the place_name exactly as you presented it (pass place_id too if you have it
-    from the results). It resolves to the same place on the map and Saved page.
+  • This is ALWAYS a save. The words "save", "bookmark", or "preferences" mean save_place, even when
+    the message also says "only" or "just" (e.g. "save only Carmine's and Tony's" = save BOTH of
+    those). NEVER use map_control keep_only for a save request — keep_only is only for changing what
+    shows ON THE MAP, never for saving.
+  • Call save_place ONCE PER place. For "save those two / all three / Carmine's and Tony's", call
+    save_place for each named place (or each place in the current list). Pass the place_name exactly
+    as you presented it (and place_id if you have it).
   • ONLY confirm the save after the tool returns success. NEVER claim a place was saved without
     calling save_place. If the tool says it couldn't find the place, tell the user to search first.
 
@@ -175,7 +181,7 @@ When to call map_control:
   • compact map beside chat (open_map / compact_map) vs full-screen map (expand_map)
   • chat-only mode with no map (chat_only / close_map)
   • zoom to a specific place (focus_place)
-  • show only one pin (keep_only)
+  • show only one pin ON THE MAP (keep_only) — NOT for "save only X" (that is a save_place request)
   • clear a route line (clear_route)
   • draw a route from user GPS OR from a landmark (route) — walk or drive
   • user browses another city while GPS is elsewhere (suppress_gps_context)

@@ -274,6 +274,30 @@ def _persist_preference_sync(
     })
 
 
+def _upsert_interaction(user_id: str, place_id: str, fields: dict[str, Any]) -> None:
+    """Upsert one interaction record. Blocking, but no Vertex/embedding call —
+    so a user-facing save never fails just because embeddings are slow/down."""
+    _mcp_tool("update-many", {
+        "database": HODARI_DB,
+        "collection": "interactions",
+        "filter": {"user_id": user_id, "place_id": place_id},
+        "update": {"$set": {"user_id": user_id, "place_id": place_id, **fields}},
+        "upsert": True,
+    })
+
+
+def _embed_interaction_async(user_id: str, place_id: str, text: str) -> None:
+    """Compute the embedding and attach it in the background (best effort)."""
+    def _run() -> None:
+        try:
+            embedding = _embed(text)
+            _upsert_interaction(user_id, place_id, {"embedding": embedding})
+        except Exception as exc:
+            logger.info("Background embedding failed for %s: %s", place_id, exc)
+
+    threading.Thread(target=_run, name="hodari-embed", daemon=True).start()
+
+
 def enqueue_preference_saves(user_id: str, stops: list[dict[str, Any]]) -> int:
     """Persist itinerary stop recommendations in a background thread.
 
@@ -416,7 +440,11 @@ def save_place(
             "Ask me to find some places first, then I can save one for you."
         )
     try:
-        _persist_preference_sync(uid, pid, name or place_name, city, "saved")
+        # Reliable write first (no embedding dependency), then embed in the
+        # background for personalization — so the save itself never fails on a
+        # slow/unavailable Vertex embedding call.
+        _upsert_interaction(uid, pid, {"place_name": name or place_name, "city": city, "action": "saved"})
+        _embed_interaction_async(uid, pid, f"{name or place_name} {city} saved")
         return f"Saved {name or place_name} to your Saved Places."
     except Exception as exc:
         logger.warning("save_place failed: %s", exc)

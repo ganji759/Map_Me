@@ -99,26 +99,37 @@ export async function* streamChat(
     yield { type: 'thinking', agent: author, label }
   }
 
+  // The read is held across milestone-timeout wake-ups: racing a fresh
+  // reader.read() against a timer and discarding the loser DROPS whatever chunk
+  // the abandoned read later resolves with — which truncated replies and lost
+  // list items. We keep ONE pending read and only clear it once consumed.
+  const TIMEOUT = Symbol('timeout')
+  let pendingRead: Promise<ReadableStreamReadResult<Uint8Array>> | null = null
+
   while (true) {
     yield* dueMilestones()
 
-    const readPromise = reader.read()
-    const timeoutPromise = pipelineStartedAt !== null
-      ? new Promise<ReadableStreamReadResult<Uint8Array>>((resolve) => {
-          const wait = PIPELINE_MILESTONES[nextMilestoneIdx]?.atMs ?? Infinity
-          const elapsed = Date.now() - (pipelineStartedAt as number)
-          const delay = Math.max(0, wait - elapsed)
-          setTimeout(() => resolve({ done: false, value: undefined as unknown as Uint8Array }), delay)
-        })
-      : null
+    if (!pendingRead) pendingRead = reader.read()
 
-    const result = timeoutPromise
-      ? await Promise.race([readPromise, timeoutPromise])
-      : await readPromise
+    let result: ReadableStreamReadResult<Uint8Array> | typeof TIMEOUT
+    if (pipelineStartedAt !== null) {
+      const wait = PIPELINE_MILESTONES[nextMilestoneIdx]?.atMs ?? Infinity
+      const elapsed = Date.now() - pipelineStartedAt
+      const delay = Math.max(0, wait - elapsed)
+      const timeoutPromise = new Promise<typeof TIMEOUT>((resolve) =>
+        setTimeout(() => resolve(TIMEOUT), Number.isFinite(delay) ? delay : 2_147_483_647),
+      )
+      result = await Promise.race([pendingRead, timeoutPromise])
+    } else {
+      result = await pendingRead
+    }
 
+    // Timeout wake-up — the read is still in flight; loop to emit due
+    // milestones and re-await the SAME read (no chunk is dropped).
+    if (result === TIMEOUT) continue
+
+    pendingRead = null
     if (result.done) break
-
-    // Timeout wake-up with no new bytes — loop again to emit due milestones.
     if (!result.value) continue
 
     buffer += decoder.decode(result.value, { stream: true })
