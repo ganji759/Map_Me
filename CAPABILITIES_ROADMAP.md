@@ -10,7 +10,7 @@ These phases extend that toward a genuinely useful match-day companion.
 
 ---
 
-## Phase 1 — Weather-aware suggestions  ☐
+## Phase 1 — Weather-aware suggestions  ☑ (shipped 2026-06-13, verified live)
 **Why:** Tourists plan around rain/heat; trivial to add — the capability already exists.
 **How:** The Maps Grounding Lite MCP already exposes `lookup_weather`
 (`agents/hodari/tools/maps_mcp.py`). Give the orchestrator a `lookup_weather`
@@ -19,7 +19,7 @@ outdoor day, and to suggest indoor alternatives / reorder stops accordingly.
 **Files:** `agents/hodari/agent.py` (tool + instruction).
 **Effort:** XS.
 
-## Phase 2 — "Open now" / opening-hours awareness  ☐
+## Phase 2 — "Open now" / opening-hours awareness  ◐ (building)
 **Why:** Don't recommend closed venues; warn "closes at 21:00".
 **How:** `search_places` already returns hours/`open_now`. Carry them through the
 discovery ranking (`tools/discovery.py`), surface in candidates, and instruct the
@@ -86,3 +86,9 @@ Marked out-of-MVP in `CLAUDE.md`; revisit as a real "Phase 2" once the above lan
 
 ## Progress log
 - 2026-06-13: Roadmap created. Building Phase 1 (weather) first.
+- 2026-06-13: Phase 1 shipped + verified live (agent returned real Paris weather
+  via lookup_weather). Phase 2 built: `open_now` carried from Maps normalizer +
+  /api/place-photos details into the place model; "Open now / Closed" badge on
+  place cards; presenter instructed to flag open/closed. Deploying.
+  Working agreement: minimize Playwright (token cost); delegate UI-heavy phases
+  (clustering, multi-day calendar) to subagents.

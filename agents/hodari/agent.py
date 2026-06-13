@@ -100,6 +100,9 @@ STEP 4 — Present the result.
   If the tool result has intent_type LIST_DISCOVERY or a candidates array without stops/routes:
     Present a numbered list of places with **bold** names, rating, price vibe, and one-line summary.
     Do NOT invent arrival times, walking legs, or a timed schedule unless the user asked to plan one.
+    If a candidate has open_now set, mention whether it's open now; if the user wants somewhere
+    right now, prefer open places and flag any that are currently closed. Never invent hours — only
+    say open/closed when open_now is present in the data.
 
   If the tool returns a full itinerary with stops and travel_from_prev:
     Format as a friendly routed plan, for example:

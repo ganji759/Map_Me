@@ -62,12 +62,19 @@ export function PlaceCardStrip({ places, activeIndex, onSelect, onShowDetails, l
                 <div className="px-3 py-2">
                   <span className="font-mono text-[9px] uppercase tracking-wider text-[#F56A00] dark:text-[#FF8C2F]">{i + 1}</span>
                   <p className="line-clamp-2 text-[13px] font-medium leading-snug tracking-tight text-text">{place.name}</p>
-                  {place.rating != null && (
-                    <p className="mt-1 flex items-center gap-1 text-[11px] text-text2">
-                      <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
-                      {place.rating.toFixed(1)}
-                    </p>
-                  )}
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                    {place.rating != null && (
+                      <span className="flex items-center gap-1 text-[11px] text-text2">
+                        <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
+                        {place.rating.toFixed(1)}
+                      </span>
+                    )}
+                    {place.open_now != null && (
+                      <span className={`text-[10px] font-semibold ${place.open_now ? 'text-[#1FA463]' : 'text-[#E5484D]'}`}>
+                        {place.open_now ? 'Open now' : 'Closed'}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </button>
               <div className="flex items-center gap-2 border-t border-border/60 px-2.5 py-2">

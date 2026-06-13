@@ -128,6 +128,20 @@ def _normalize_place(place: dict[str, Any]) -> dict[str, Any]:
     if rating is None and isinstance(place.get("ratings"), dict):
         rating = place["ratings"].get("score")
 
+    # Opening hours (best effort — present only when Grounding Lite returns them).
+    open_now: Optional[bool] = None
+    for hk in ("currentOpeningHours", "regularOpeningHours", "opening_hours"):
+        hours = place.get(hk)
+        if isinstance(hours, dict):
+            val = hours.get("openNow")
+            if val is None:
+                val = hours.get("open_now")
+            if isinstance(val, bool):
+                open_now = val
+                break
+    if open_now is None and isinstance(place.get("open_now"), bool):
+        open_now = place.get("open_now")
+
     return {
         "place_id": place_ref,
         "name": _name_from_attribution(place),
@@ -151,5 +165,6 @@ def _normalize_place(place: dict[str, Any]) -> dict[str, Any]:
             or links.get("placeUrl")
             or (place.get("attribution") or {}).get("url")
         ),
+        "open_now": open_now,
         "personalization_score": 0.0,
     }

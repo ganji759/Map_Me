@@ -212,12 +212,17 @@ export default function LandingPage() {
       fetch(`/api/place-photos?placeId=${encodeURIComponent(place.place_id)}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
-          if (!data?.photoUrls?.length) return
-          photoCacheRef.current.set(place.place_id, data.photoUrls)
+          if (!data) return
+          const patch: Partial<Place> = {}
+          if (data.photoUrls?.length) {
+            photoCacheRef.current.set(place.place_id, data.photoUrls)
+            patch.photo_url = data.photoUrls[0]
+            patch.photos = data.photoUrls
+          }
+          if (typeof data.isOpen === 'boolean') patch.open_now = data.isOpen
+          if (Object.keys(patch).length === 0) return
           setPlaces((prev) =>
-            prev.map((p) =>
-              p.place_id === place.place_id ? { ...p, photo_url: data.photoUrls[0], photos: data.photoUrls } : p,
-            ),
+            prev.map((p) => (p.place_id === place.place_id ? { ...p, ...patch } : p)),
           )
         })
         .catch(() => {})

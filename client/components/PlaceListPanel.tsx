@@ -64,12 +64,19 @@ export function PlaceListPanel({ places, activeIndex, onSelect, onShowDetails, o
                         {i + 1}
                       </span>
                       <p className="mt-0.5 text-[14px] font-medium leading-snug tracking-tight text-text">{place.name}</p>
-                      {place.rating != null && (
-                        <p className="mt-1 flex items-center gap-1 text-[11px] text-text2">
-                          <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
-                          {place.rating.toFixed(1)}
-                        </p>
-                      )}
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                        {place.rating != null && (
+                          <span className="flex items-center gap-1 text-[11px] text-text2">
+                            <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
+                            {place.rating.toFixed(1)}
+                          </span>
+                        )}
+                        {place.open_now != null && (
+                          <span className={`text-[10px] font-semibold ${place.open_now ? 'text-[#1FA463]' : 'text-[#E5484D]'}`}>
+                            {place.open_now ? 'Open now' : 'Closed'}
+                          </span>
+                        )}
+                      </div>
                       {place.address && (
                         <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-text2">{place.address}</p>
                       )}

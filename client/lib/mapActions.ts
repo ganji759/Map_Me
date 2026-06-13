@@ -106,6 +106,7 @@ function normalizePlace(raw: unknown): Place | null {
     categories: Array.isArray(p.categories) ? (p.categories as string[]) : [],
     rating: typeof p.rating === 'number' ? p.rating : undefined,
     price_level: typeof p.price_level === 'string' ? p.price_level : undefined,
+    open_now: typeof p.open_now === 'boolean' ? p.open_now : undefined,
     summary: typeof p.summary === 'string' ? p.summary : undefined,
     maps_url: typeof p.maps_url === 'string' ? p.maps_url : undefined,
     photo_url: typeof p.photo_url === 'string' ? p.photo_url : undefined,

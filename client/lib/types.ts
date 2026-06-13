@@ -14,6 +14,8 @@ export interface Place {
   price_level?: string
   summary?: string
   maps_url?: string
+  /** Whether the place is open right now, when known. */
+  open_now?: boolean
   /** Direct image URL when available from search/backend */
   photo_url?: string
   /** Legacy photo references or absolute URLs */
