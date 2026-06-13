@@ -1,0 +1,37 @@
+Copyright © 2026 Pacifique Mugisho. All Rights Reserved.
+
+Hodari — multi-agent tourist AI assistant for the 2026 FIFA World Cup
+("the Software").
+
+PROPRIETARY AND CONFIDENTIAL
+
+This Software, including its source code, design, architecture, user interface,
+agent prompts, data models, documentation, and all associated materials, is the
+proprietary and confidential property of Pacifique Mugisho ("the Owner") and is
+protected by copyright and other intellectual-property laws.
+
+NO LICENSE IS GRANTED. No part of the Software may be, in whole or in part:
+
+  1. copied, reproduced, downloaded, or stored, except by persons expressly
+     authorized in writing by the Owner;
+  2. used, executed, or deployed for any purpose, commercial or otherwise;
+  3. modified, adapted, translated, or used to create derivative works;
+  4. distributed, published, sublicensed, sold, rented, leased, or otherwise
+     made available to any third party;
+  5. reverse-engineered, decompiled, or disassembled; or
+  6. used to train, fine-tune, or evaluate any machine-learning model,
+
+without the prior, explicit, written permission of the Owner.
+
+Access to this repository or its contents does not transfer any ownership or
+license rights. Any unauthorized use, reproduction, or distribution of the
+Software, or of the ideas, concepts, or know-how embodied in it, is strictly
+prohibited and may result in civil and criminal liability.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. IN NO EVENT SHALL THE OWNER BE
+LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM, OUT OF, OR IN
+CONNECTION WITH THE SOFTWARE OR ITS USE.
+
+For licensing inquiries, contact: pacymugisho@gmail.com

@@ -281,3 +281,13 @@ See [`Hodari_System_Architecture.md`](./Hodari_System_Architecture.md) for the f
 ## Out of scope (MVP)
 
 Booking/payments, email notifications, calendar sync, OAuth, and multilingual support are intentionally deferred.
+
+---
+
+## Copyright
+
+Copyright © 2026 Pacifique Mugisho. All Rights Reserved.
+
+This is proprietary and confidential software. No part of it may be copied,
+used, modified, distributed, or reverse-engineered without the prior written
+permission of the owner. See [LICENSE](./LICENSE) for the full terms.
