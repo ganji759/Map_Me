@@ -29,6 +29,7 @@ import { ModelSwitcher, type ModelId } from './ModelSwitcher'
 import { CollapsibleMessage } from './CollapsedReply'
 import { TypingIndicator } from './TypingIndicator'
 import { OpenMapButton } from './OpenMapButton'
+import { shownMessages } from '@/lib/animationMemory'
 
 interface Props {
   messages: ChatMessage[]
@@ -189,6 +190,12 @@ export function ChatPanel({
     }
   }, [streaming, caretVisible])
 
+  // Once a message has been rendered, remember it so its entrance/typewriter
+  // does not replay when this panel remounts (switching chat <-> map, or pages).
+  useEffect(() => {
+    messages.forEach((m) => shownMessages.add(m.id))
+  }, [messages])
+
   // After the stream ends, the last reply keeps typing out for a beat. Keep the
   // view pinned to the bottom while it reveals — unless the user scrolled up.
   useEffect(() => {
@@ -345,7 +352,7 @@ export function ChatPanel({
             {messages.map((msg, i) => (
             <motion.div
               key={msg.id}
-              initial={reduced ? false : { opacity: 0, y: 10 }}
+              initial={reduced || shownMessages.has(msg.id) ? false : { opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{
                 duration: reduced ? 0 : 0.25,
@@ -370,6 +377,7 @@ export function ChatPanel({
                         streaming={streaming && msg.id === lastMsgId}
                         showCaret={caretVisible && streaming && msg.id === lastMsgId}
                         animate={msg.id === lastMsgId}
+                        messageKey={msg.id}
                       />
                     </div>
                   ) : (

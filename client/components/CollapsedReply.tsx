@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { ChevronDown } from 'lucide-react'
+import { shownMessages } from '@/lib/animationMemory'
 
 const LONG_LINE_THRESHOLD = 8
 const PREVIEW_LINES = 4
@@ -65,14 +66,22 @@ interface CollapsibleMessageProps {
   showCaret?: boolean
   /** Type this reply out left-to-right (the active/last assistant message). */
   animate?: boolean
+  /** Stable id; once its reveal has played it won't replay on remount. */
+  messageKey?: string
 }
 
 /** Long assistant replies — full text by default; collapse only past 8 lines. */
-export function CollapsibleMessage({ content, streaming = false, showCaret = false, animate = false }: CollapsibleMessageProps) {
+export function CollapsibleMessage({ content, streaming = false, showCaret = false, animate = false, messageKey }: CollapsibleMessageProps) {
   const reduced = useReducedMotion()
   const [expanded, setExpanded] = useState(true)
 
-  const revealed = useTypewriter(content, animate && !reduced)
+  // Decide ONCE at mount whether to type this out: skip if reduced-motion or if
+  // this message's reveal already played earlier this session (view switch).
+  const [shouldAnimate] = useState(
+    () => animate && !reduced && !(messageKey ? shownMessages.has(messageKey) : false),
+  )
+
+  const revealed = useTypewriter(content, shouldAnimate)
   const typing = revealed.length < content.length
 
   const long = lineCount(content) > LONG_LINE_THRESHOLD

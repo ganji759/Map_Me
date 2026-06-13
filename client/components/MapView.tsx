@@ -12,6 +12,7 @@ import {
   type LatLng,
 } from '@/lib/geo'
 import { PlaceImage } from './PlaceImage'
+import { cinematicMapKeys } from '@/lib/animationMemory'
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ''
 const ROUTE_ORANGE = '#F56A00'
@@ -655,6 +656,20 @@ function CinematicCamera({
     }
 
     const target = focus && isValidCoord(focus) ? focus : null
+
+    // Don't replay the cinematic glide/orbit when the map merely remounts
+    // (switching chat <-> full map, or page <-> page) for a marker set + focus
+    // we've already animated this session — snap into place instead. A new
+    // search or a different focused pin produces a new key and animates.
+    const cinematicKey = `${resetKey}|${focusKey}`
+    if (cinematicKey.trim() !== '|' && cinematicMapKeys.has(cinematicKey)) {
+      if (target && glideCenter) {
+        const settledTilt = map.getRenderingType?.() === 'RASTER' ? RASTER_3D_TILT : VECTOR_3D_TILT
+        moveCamera({ center: target, tilt: settledTilt })
+      }
+      return
+    }
+    cinematicMapKeys.add(cinematicKey)
 
     if (!target || !glideCenter) {
       startOrbit()
