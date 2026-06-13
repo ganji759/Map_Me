@@ -23,6 +23,9 @@ VALID_OPS = frozenset({
     "keep_only",
     "route",
     "suppress_gps_context",
+    "highlight_place",
+    "circle_place",
+    "clear_annotations",
 })
 
 
@@ -61,6 +64,15 @@ def map_control(
                 landmark: required when from is "landmark" (e.g. "Musée du Louvre, Paris")
                 to_place_index or to_place_name: destination from current candidates/itinerary
                 mode: "WALK" or "DRIVE" (default WALK)
+            highlight_place — mark a place with a distinct colored pin (keeps the
+                other pins as they are). Fields: place_index or place_name, and
+                color (one of: green, red, blue, purple, black, yellow, pink).
+                Works for a place from an EARLIER search too (e.g. mark the
+                restaurant green while the current hotels stay orange).
+            circle_place — draw a colored highlight circle around a place. Fields:
+                place_index or place_name, color (optional), radius_m (optional,
+                default 350). Also colors that pin to match.
+            clear_annotations — remove all highlight colors and circles.
             suppress_gps_context — stop attaching the user's GPS to later messages
                 (use when they browse another city, e.g. Paris while GPS is elsewhere).
         tool_context: Injected by ADK.

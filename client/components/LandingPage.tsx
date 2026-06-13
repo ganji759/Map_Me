@@ -9,13 +9,16 @@ import { PlaceCardStrip } from '@/components/PlaceCardStrip'
 import { CollapsedReply } from '@/components/CollapsedReply'
 import { PlaceDetailsPanel } from '@/components/PlaceDetailsPanel'
 import { streamChat, fetchSessionState } from '@/lib/stream'
-import { pinsFarFromUser, requestUserLocation } from '@/lib/geo'
+import { isValidCoord, pinsFarFromUser, requestUserLocation } from '@/lib/geo'
 import {
   applyMapActions,
+  applyAnnotationActions,
   parseMapActions,
   shouldAttachGps,
+  EMPTY_ANNOTATIONS,
   type CustomRouteConfig,
   type MapActionEffects,
+  type MapAnnotations,
   type TravelMode,
 } from '@/lib/mapActions'
 import {
@@ -160,12 +163,21 @@ export default function LandingPage() {
   const itineraryRef = useRef(itinerary)
   const activeStopRef = useRef(activeStop)
   const fetchedPhotoIdsRef = useRef(new Set<string>())
+  // Every place seen this session, so the AI can color/circle a place from an
+  // earlier search (e.g. mark the restaurant while showing nearby hotels).
+  const placeMemoryRef = useRef<Map<string, Place>>(new Map())
+  const [annotations, setAnnotations] = useState<MapAnnotations>(EMPTY_ANNOTATIONS)
   const [savedPlaceIds, setSavedPlaceIds] = useState<Set<string>>(() => {
     if (typeof window === 'undefined') return new Set()
     try { return new Set(JSON.parse(localStorage.getItem('hodari_saved') ?? '[]')) } catch { return new Set() }
   })
 
-  useEffect(() => { placesRef.current = places }, [places])
+  useEffect(() => {
+    placesRef.current = places
+    for (const p of places) {
+      if (p.place_id && isValidCoord(p.coordinates)) placeMemoryRef.current.set(p.place_id, p)
+    }
+  }, [places])
   useEffect(() => { itineraryRef.current = itinerary }, [itinerary])
   useEffect(() => { activeStopRef.current = activeStop }, [activeStop])
   useEffect(() => { speakRepliesRef.current = speakReplies }, [speakReplies])
@@ -350,6 +362,17 @@ export default function LandingPage() {
         activeStop: activeStopRef.current,
       })
       applyMapEffects(effects)
+
+      // AI-drawn map annotations (colors / circles / extra markers).
+      if (actions.some((a) => a.op === 'highlight_place' || a.op === 'circle_place' || a.op === 'clear_annotations')) {
+        const stops = itineraryRef.current?.stops ?? []
+        const list: Place[] = placesRef.current.length
+          ? placesRef.current
+          : stops.map((s) => ({ ...s, categories: [] as string[] }))
+        const memory = [...placeMemoryRef.current.values()]
+        setAnnotations((prev) => applyAnnotationActions(actions, list, memory, prev))
+        setMapVisible(true)
+      }
     }
 
     const pollForItinerary = async () => {
@@ -617,6 +640,8 @@ export default function LandingPage() {
     cancelSpeech()
     sessionId.current = uid()
     try { localStorage.setItem('hodari_active_session', sessionId.current) } catch { /* ignore */ }
+    placeMemoryRef.current.clear()
+    setAnnotations(EMPTY_ANNOTATIONS)
     setMessages([])
     setLoading(false)
     setThinkingSteps([])
@@ -641,6 +666,7 @@ export default function LandingPage() {
     cancelSpeech()
     sessionId.current = item.id
     try { localStorage.setItem('hodari_active_session', item.id) } catch { /* ignore */ }
+    setAnnotations(EMPTY_ANNOTATIONS)
     setMessages(item.messages)
     setLoading(false)
     setThinkingSteps([])
@@ -931,6 +957,7 @@ export default function LandingPage() {
                 <MapView
                   places={mapPlaces as Place[]}
                   itinerary={itineraryStops}
+                  annotations={annotations}
                   activeStopIndex={activeStop}
                   onMarkerClick={handleMarkerClick}
                   userLocation={userLocation}
@@ -992,6 +1019,7 @@ export default function LandingPage() {
           <MapView
             places={mapPlaces as Place[]}
             itinerary={itineraryStops}
+            annotations={annotations}
             activeStopIndex={activeStop}
             onMarkerClick={handleMarkerClick}
             userLocation={userLocation}

@@ -185,6 +185,8 @@ When to call map_control:
   • clear a route line (clear_route)
   • draw a route from user GPS OR from a landmark (route) — walk or drive
   • user browses another city while GPS is elsewhere (suppress_gps_context)
+  • mark a place with a colour (highlight_place) or draw a circle around it (circle_place)
+  • remove all colours/circles (clear_annotations)
 
 Examples:
   "show full map" / "expand the map" →
@@ -202,6 +204,14 @@ Examples:
     [{"op":"clear_route"}] then route from landmark if they named one (e.g. Louvre).
   "only Omusubi Gonbei on the map" →
     [{"op":"keep_only","place_name":"Omusubi Gonbei"},{"op":"focus_place","place_name":"Omusubi Gonbei"}]
+  "mark the restaurant in green and keep showing the hotels" / "circle the restaurant so I can see it" →
+    [{"op":"highlight_place","place_name":"Le Paris Paris","color":"green"},
+     {"op":"circle_place","place_name":"Le Paris Paris","color":"green"}]
+    (highlight_place/circle_place do NOT remove the other pins — use them, not keep_only, when the
+     user wants one place marked differently while still seeing the rest. They also work for a place
+     from an earlier search, like a restaurant, overlaid on the current hotels.)
+  "remove the colours / clear the markings" →
+    [{"op":"clear_annotations"}]
   User searches Paris but GPS is in another country →
     include {"op":"suppress_gps_context"} so pins are not biased by wrong GPS.
 

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { APIProvider, Map, AdvancedMarker, Pin, useMap } from '@vis.gl/react-google-maps'
 import { AlertCircle, ChevronLeft, Compass, Loader2, MapPin, Maximize2, Minimize2, RotateCcw, RotateCw, Star } from 'lucide-react'
 import type { ItineraryStop, Place, Theme } from '@/lib/types'
-import type { CustomRouteConfig, TravelMode } from '@/lib/mapActions'
+import type { CustomRouteConfig, MapAnnotations, TravelMode } from '@/lib/mapActions'
 import {
   distanceKm,
   isValidCoord,
@@ -138,6 +138,8 @@ export interface RouteInfo {
 interface Props {
   places: Place[]
   itinerary: ItineraryStop[] | null
+  /** AI-drawn map annotations (colored pins, circles, extra markers). */
+  annotations?: MapAnnotations
   activeStopIndex: number | null
   onMarkerClick: (index: number) => void
   userLocation: { lat: number; lng: number } | null
@@ -961,6 +963,7 @@ function MapMarkers({
   onMarkerClick,
   showUserLocation,
   userLocation,
+  colors = {},
 }: {
   markers: (Place | ItineraryStop)[]
   activeStopIndex: number | null
@@ -968,6 +971,8 @@ function MapMarkers({
   showUserLocation: boolean
   userLocation: LatLng | null
   numberedStops?: boolean
+  /** place_id -> color, recolors the AI-highlighted pins. */
+  colors?: Record<string, string>
 }) {
   return (
     <>
@@ -981,22 +986,28 @@ function MapMarkers({
         const coords = 'coordinates' in item ? item.coordinates : (item as Place).coordinates
         const name = 'name' in item ? item.name : (item as Place).name
         const isActive = activeStopIndex === i
+        const pid = 'place_id' in item ? item.place_id : ''
+        const hl = pid ? colors[pid] : undefined
 
         return (
           <AdvancedMarker
-            key={`${('place_id' in item && item.place_id) ? item.place_id : 'm'}-${i}`}
+            key={`${pid ? pid : 'm'}-${i}`}
             position={coords}
             title={name}
-            zIndex={isActive ? 5 : 1}
+            zIndex={hl ? 6 : isActive ? 5 : 1}
             onClick={() => onMarkerClick(i)}
           >
-            <Pin
-              background={isActive ? ROUTE_ORANGE : '#ffffff'}
-              borderColor={isActive ? '#C44A00' : ROUTE_ORANGE}
-              glyphColor={isActive ? '#ffffff' : ROUTE_ORANGE}
-              glyph={String(i + 1)}
-              scale={isActive ? 1.2 : 1}
-            />
+            {hl ? (
+              <Pin background={hl} borderColor={hl} glyphColor="#ffffff" glyph={String(i + 1)} scale={isActive ? 1.25 : 1.1} />
+            ) : (
+              <Pin
+                background={isActive ? ROUTE_ORANGE : '#ffffff'}
+                borderColor={isActive ? '#C44A00' : ROUTE_ORANGE}
+                glyphColor={isActive ? '#ffffff' : ROUTE_ORANGE}
+                glyph={String(i + 1)}
+                scale={isActive ? 1.2 : 1}
+              />
+            )}
           </AdvancedMarker>
         )
       })}
@@ -1004,9 +1015,56 @@ function MapMarkers({
   )
 }
 
+/** Extra AI-placed markers (places not in the current list, e.g. an anchor). */
+function AnnotationMarkers({ markers }: { markers: MapAnnotations['markers'] }) {
+  return (
+    <>
+      {markers.filter((m) => isValidCoord(m.coordinates)).map((m) => (
+        <AdvancedMarker key={`anno-${m.id}`} position={m.coordinates} title={m.name} zIndex={7}>
+          <Pin background={m.color} borderColor={m.color} glyphColor="#ffffff" glyph="★" scale={1.15} />
+        </AdvancedMarker>
+      ))}
+    </>
+  )
+}
+
+/** Draws AI highlight circles with native google.maps.Circle overlays. */
+function MapCircles({ circles }: { circles: MapAnnotations['circles'] }) {
+  const map = useMap()
+  const ref = useRef<google.maps.Circle[]>([])
+
+  useEffect(() => {
+    if (!map || typeof google === 'undefined') return
+    ref.current.forEach((c) => c.setMap(null))
+    ref.current = circles
+      .filter((c) => isValidCoord(c.center) && c.radiusM > 0)
+      .map(
+        (c) =>
+          new google.maps.Circle({
+            map,
+            center: c.center,
+            radius: c.radiusM,
+            strokeColor: c.color,
+            strokeOpacity: 0.9,
+            strokeWeight: 2,
+            fillColor: c.color,
+            fillOpacity: 0.12,
+            clickable: false,
+          }),
+      )
+    return () => {
+      ref.current.forEach((c) => c.setMap(null))
+      ref.current = []
+    }
+  }, [map, circles])
+
+  return null
+}
+
 function MapCanvas({
   places,
   itinerary,
+  annotations,
   activeStopIndex,
   onMarkerClick,
   userLocation,
@@ -1109,7 +1167,11 @@ function MapCanvas({
           onMarkerClick={onMarkerClick}
           showUserLocation={showUserLocation}
           userLocation={userLocation}
+          colors={annotations?.colors}
         />
+
+        {annotations && annotations.markers.length > 0 && <AnnotationMarkers markers={annotations.markers} />}
+        {annotations && annotations.circles.length > 0 && <MapCircles circles={annotations.circles} />}
 
         {itinerary && itinerary.length >= 2 && !routeFromUser && !customRoute && (
           <RoutePolyline stops={itinerary} />

@@ -1,6 +1,6 @@
 import { findPlaceIndexInText } from './mapIntents'
 import type { Itinerary, Place } from './types'
-import type { LatLng } from './geo'
+import { isValidCoord, type LatLng } from './geo'
 
 export type { TravelMode } from './routing'
 import type { TravelMode } from './routing'
@@ -18,6 +18,44 @@ export type MapAction =
   | { op: 'keep_only'; place_index?: number; place_name?: string }
   | { op: 'route'; from: 'user' | 'landmark'; landmark?: string; to_place_index?: number; to_place_name?: string; mode?: TravelMode }
   | { op: 'suppress_gps_context' }
+  | { op: 'highlight_place'; place_index?: number; place_name?: string; color?: string }
+  | { op: 'circle_place'; place_index?: number; place_name?: string; color?: string; radius_m?: number }
+  | { op: 'clear_annotations' }
+
+// ── Map annotations (AI-drawn colors / circles / extra markers) ──────────────
+
+const ANNOTATION_COLORS: Record<string, string> = {
+  green: '#1FA463',
+  red: '#E5484D',
+  blue: '#2E7DF6',
+  purple: '#8B5CF6',
+  black: '#1F2430',
+  yellow: '#F5B800',
+  pink: '#E64980',
+  orange: '#F56A00',
+}
+
+/** Map a color name (or #hex) to a hex string; defaults to a clear green. */
+export function normalizeAnnotationColor(name?: string): string {
+  if (!name) return ANNOTATION_COLORS.green
+  const k = name.trim().toLowerCase()
+  if (ANNOTATION_COLORS[k]) return ANNOTATION_COLORS[k]
+  return /^#[0-9a-f]{6}$/i.test(name.trim()) ? name.trim() : ANNOTATION_COLORS.green
+}
+
+export interface AnnotationMarker { id: string; name: string; coordinates: LatLng; color: string }
+export interface AnnotationCircle { id: string; center: LatLng; radiusM: number; color: string }
+
+export interface MapAnnotations {
+  /** place_id -> color, recolors a pin already on the map. */
+  colors: Record<string, string>
+  /** Extra markers overlaid for places not in the current list. */
+  markers: AnnotationMarker[]
+  /** Highlight circles to draw. */
+  circles: AnnotationCircle[]
+}
+
+export const EMPTY_ANNOTATIONS: MapAnnotations = { colors: {}, markers: [], circles: [] }
 
 export interface CustomRouteConfig {
   from: 'user' | 'landmark'
@@ -153,6 +191,9 @@ const VALID_OPS = new Set([
   'keep_only',
   'route',
   'suppress_gps_context',
+  'highlight_place',
+  'circle_place',
+  'clear_annotations',
 ])
 
 export function parseMapActions(raw: unknown): MapAction[] {
@@ -375,6 +416,77 @@ export function mergeMapActionEffects(
   next: MapActionEffects,
 ): MapActionEffects {
   return { ...current, ...next }
+}
+
+function upsertById<T extends { id: string }>(arr: T[], item: T): T[] {
+  const i = arr.findIndex((x) => x.id === item.id)
+  if (i === -1) return [...arr, item]
+  const copy = arr.slice()
+  copy[i] = item
+  return copy
+}
+
+/**
+ * Apply highlight_place / circle_place / clear_annotations actions to the map
+ * annotation state. A place is resolved against the current visible list first,
+ * then against `memory` (every place seen this session) — so the AI can color
+ * or circle a place from an earlier search (e.g. mark the restaurant green while
+ * the hotels stay orange). Places not in the current list become extra markers.
+ */
+export function applyAnnotationActions(
+  actions: MapAction[],
+  list: Place[],
+  memory: Place[],
+  current: MapAnnotations,
+): MapAnnotations {
+  let next = current
+
+  const resolve = (a: { place_index?: number; place_name?: string }): Place | null => {
+    if (typeof a.place_index === 'number' && a.place_index >= 0 && a.place_index < list.length) {
+      return list[a.place_index]
+    }
+    if (a.place_name) {
+      const li = findPlaceIndexInText(a.place_name, list)
+      if (li !== null) return list[li]
+      const mi = findPlaceIndexInText(a.place_name, memory)
+      if (mi !== null) return memory[mi]
+    }
+    return null
+  }
+
+  for (const action of actions) {
+    if (action.op === 'clear_annotations') {
+      next = { colors: {}, markers: [], circles: [] }
+      continue
+    }
+    if (action.op !== 'highlight_place' && action.op !== 'circle_place') continue
+
+    const place = resolve(action)
+    if (!place || !isValidCoord(place.coordinates)) continue
+    const color = normalizeAnnotationColor(action.color)
+    const inList = list.some((x) => x.place_id === place.place_id)
+
+    next = {
+      ...next,
+      colors: { ...next.colors, [place.place_id]: color },
+      markers: inList
+        ? next.markers
+        : upsertById(next.markers, { id: place.place_id, name: place.name, coordinates: place.coordinates, color }),
+    }
+
+    if (action.op === 'circle_place') {
+      const radiusM =
+        typeof action.radius_m === 'number' && action.radius_m > 0
+          ? Math.min(action.radius_m, 5000)
+          : 350
+      next = {
+        ...next,
+        circles: upsertById(next.circles, { id: place.place_id, center: place.coordinates, radiusM, color }),
+      }
+    }
+  }
+
+  return next
 }
 
 /** Whether to attach GPS coordinates to the agent message. */
