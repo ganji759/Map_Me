@@ -19,7 +19,7 @@ outdoor day, and to suggest indoor alternatives / reorder stops accordingly.
 **Files:** `agents/hodari/agent.py` (tool + instruction).
 **Effort:** XS.
 
-## Phase 2 — "Open now" / opening-hours awareness  ◐ (building)
+## Phase 2 — "Open now" / opening-hours awareness  ☑ (shipped 2026-06-13)
 **Why:** Don't recommend closed venues; warn "closes at 21:00".
 **How:** `search_places` already returns hours/`open_now`. Carry them through the
 discovery ranking (`tools/discovery.py`), surface in candidates, and instruct the
@@ -27,7 +27,7 @@ presenter to flag open/closed and de-prioritise closed places for the stated tim
 **Files:** `tools/discovery.py`, `sub_agents/explorer.py`, `agent.py`, client place card.
 **Effort:** S.
 
-## Phase 3 — Hard dietary & accessibility filters  ☐
+## Phase 3 — Hard dietary & accessibility filters  ☑ (shipped 2026-06-13)
 **Why:** Halal/vegetarian/wheelchair are requirements, not hints.
 **How:** Profile already stores `dietary` + `accessibility`. Make Planner encode
 them as hard constraints and Explorer filter (not just boost) on them; presenter
@@ -35,7 +35,11 @@ states how each pick meets them.
 **Files:** `sub_agents/planner.py`, `sub_agents/explorer.py`, `tools/discovery.py`.
 **Effort:** S–M.
 
-## Phase 4 — Match-schedule awareness  ☐  ← biggest differentiator
+## Phase 4 — Match-schedule awareness  ☑ (shipped 2026-06-13)  ← biggest differentiator
+Shipped as host-venue awareness: a `world_cup_venues` tool with the 16 host
+stadiums (city, country, coords) for accurate match-day location bias, plus
+match-day planning behavior. Exact fixtures (team vs team / kickoff) remain
+user-supplied — no live schedule source wired yet.
 **Why:** It's a World Cup app; everything should anchor to fixtures (team, venue,
 date, kickoff) and host cities/stadiums.
 **How:** Curated table of the 16 host cities + stadiums (known, static). A

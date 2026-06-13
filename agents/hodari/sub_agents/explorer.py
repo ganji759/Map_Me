@@ -40,7 +40,15 @@ STEPS (follow in order):
    - Deduplicate by name similarity — if a local result and a Maps result refer to the
      same venue, keep the one with more detail (usually the local result).
 
-5. Return 5–10 best candidates.
+5. HARD-FILTER on dietary & accessibility constraints from the plan. These are
+   requirements, not preferences: EXCLUDE any candidate that does not meet a
+   stated dietary need (halal, vegetarian, vegan, kosher, gluten-free, …) or
+   accessibility need (wheelchair accessible, step-free, …). Do not merely lower
+   its score. If filtering leaves too few results, run another search_places with
+   the constraint in the query rather than relaxing it. In each kept candidate's
+   summary, note how it meets the constraint (e.g. "fully vegetarian menu").
+
+6. Return 5–10 best candidates.
 
 Return ONLY a valid JSON array — no markdown fences, no commentary:
 [

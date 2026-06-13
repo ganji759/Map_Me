@@ -25,10 +25,18 @@ Return ONLY valid JSON matching this schema — no commentary, no markdown fence
   ]
 }
 
+DIETARY & ACCESSIBILITY ARE HARD REQUIREMENTS, not preferences:
+- If the request (or the user's profile, passed in context) includes dietary needs (halal, vegetarian,
+  vegan, kosher, gluten-free, etc.) or accessibility needs (wheelchair accessible, step-free, etc.),
+  put them in constraints AND bake them into EVERY relevant subtask's description so the search is
+  filtered, not just nudged. E.g. subtask "Find HALAL restaurants near the stadium that are
+  WHEELCHAIR ACCESSIBLE", not just "Find restaurants near the stadium".
+- Never drop a stated dietary/accessibility need, even if the user didn't repeat it this turn.
+
 Examples of good subtasks:
 - "Find vegetarian restaurants near Camp Nou with outdoor seating"
-- "Find family-friendly attractions within 30 minutes of the stadium"
-- "Find fast options under $15 near Lusail Stadium"
+- "Find halal, wheelchair-accessible restaurants within 30 minutes of the stadium"
+- "Find fast vegan options under $15 near Lusail Stadium"
 """
 
 planner_agent = LlmAgent(

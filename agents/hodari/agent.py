@@ -11,6 +11,7 @@ from .sub_agents.explorer import explorer_agent
 from .sub_agents.itinerary import itinerary_agent
 from .tools.map_control import map_control
 from .tools.maps_mcp import create_maps_toolset
+from .tools.fixtures import world_cup_venues
 from .tools.mongo_tools import load_user_profile, list_saved_places, save_place
 from .tools.pipeline_tool import HodariPipelineTool
 from .plugins.profiling_plugin import create_profiling_plugin, profiling_enabled
@@ -89,7 +90,10 @@ STEP 2 — Load profile:
 
 STEP 3 — Call the hodari_pipeline tool.
   Pass a single clear `request` string that captures everything you know: what they want, location,
-  time, budget, dietary and accessibility constraints. The tool auto-routes:
+  time, budget, dietary and accessibility constraints. ALWAYS fold the user's dietary and
+  accessibility needs from the loaded profile into the request as HARD requirements (e.g. "halal",
+  "vegetarian", "wheelchair accessible"), even when they did not repeat them this turn. The tool
+  auto-routes:
     • Simple place discovery ("find 4 restaurants near X") → fast list of places (no routes/times).
     • Full outing ("plan my afternoon", multi-stop with timing) → full itinerary with routes.
   Example list request: "Find 4 vegetarian restaurants near Camp Nou, Barcelona, big budget."
@@ -228,6 +232,23 @@ MAP UI vs NEW SEARCH (critical):
   • "Location 2" / "option 2" → second item in the current numbered list, not a new search.
   • Cheapest / best pick → answer in chat AND map_control focus_place on that place if helpful.
 
+═══ MATCH-DAY PLANNING (world_cup_venues) ═══
+
+This is the 2026 FIFA World Cup. Use world_cup_venues to get the exact host
+stadium + coordinates for any of the 16 host cities (USA, Canada, Mexico) — call
+it when the user mentions a match, a stadium, or a host city, and use the
+returned coordinates to bias place searches near the venue.
+
+When the user is planning around a match ("I'm watching the game at MetLife on
+June 20", "plan my match day"):
+  • Anchor the plan to the venue (from world_cup_venues) and the kickoff time.
+  • If you don't know the kickoff time, ask for it briefly (you do NOT have the
+    fixture schedule — never invent which teams play or exact match times).
+  • Build the day around it: a pre-match meal near the stadium with time to spare,
+    advice to arrive early (security/transit), and a post-match spot. Factor in
+    that stadium-area places get very busy on match day.
+  • You DO know the 16 host stadiums and cities — answer those confidently.
+
 ═══ WEATHER (lookup_weather) ═══
 
 You can check live/forecast weather with lookup_weather (pass a location — a city
@@ -271,6 +292,7 @@ root_agent = LlmAgent(
         map_control,
         save_place,
         list_saved_places,
+        world_cup_venues,
         create_maps_toolset(tools=["lookup_weather"]),
         HodariPipelineTool(agent=_pipeline),
     ],
