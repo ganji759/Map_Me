@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { APIProvider, Map, AdvancedMarker, Pin, useMap } from '@vis.gl/react-google-maps'
-import { AlertCircle, ChevronLeft, Compass, Loader2, MapPin, Maximize2, Minimize2, RotateCcw, RotateCw, Star } from 'lucide-react'
+import { APIProvider, Map, AdvancedMarker, InfoWindow, Pin, useMap } from '@vis.gl/react-google-maps'
+import { AlertCircle, ChevronLeft, Compass, ExternalLink, Globe, Image as ImageIcon, Loader2, MapPin, Maximize2, Minimize2, Navigation, RotateCcw, RotateCw, Star } from 'lucide-react'
 import type { ItineraryStop, Place, Theme } from '@/lib/types'
 import type { CustomRouteConfig, MapAnnotations, TravelMode } from '@/lib/mapActions'
 import {
@@ -164,6 +164,11 @@ interface Props {
   routeInfo?: RouteInfo | null
   /** Optional bar rendered above the map canvas (voice mode). */
   header?: ReactNode
+  /** Full-map marker action bubble (opens the full details panel / saves / routes). */
+  onPlaceFullDetails?: (place: Place) => void
+  onPlaceSave?: (place: Place) => void
+  onPlaceRoute?: (index: number) => void
+  savedPlaceIds?: Set<string>
 }
 
 function RoutePolyline({ stops }: { stops: ItineraryStop[] }) {
@@ -1033,15 +1038,79 @@ function GlowMarkerContent({ color, glyph }: { color: string; glyph: string }) {
 }
 
 /** Extra AI-placed markers (places not in the current list, e.g. an anchor). */
-function AnnotationMarkers({ markers }: { markers: MapAnnotations['markers'] }) {
+function AnnotationMarkers({ markers, placeCoords = [] }: { markers: MapAnnotations['markers']; placeCoords?: LatLng[] }) {
+  // A highlighted place already renders its own (recolored) numbered marker, so
+  // skip any annotation marker that sits on top of one — otherwise you see TWO
+  // markers stacked at the same spot.
+  const onAPlace = (c: LatLng) =>
+    placeCoords.some((p) => Math.abs(p.lat - c.lat) < 2e-4 && Math.abs(p.lng - c.lng) < 2e-4)
   return (
     <>
-      {markers.filter((m) => isValidCoord(m.coordinates)).map((m) => (
-        <AdvancedMarker key={`anno-${m.id}`} position={m.coordinates} title={m.name} zIndex={7}>
-          <GlowMarkerContent color={m.color} glyph="★" />
-        </AdvancedMarker>
-      ))}
+      {markers
+        .filter((m) => isValidCoord(m.coordinates) && !onAPlace(m.coordinates))
+        .map((m) => (
+          <AdvancedMarker key={`anno-${m.id}`} position={m.coordinates} title={m.name} zIndex={7}>
+            <GlowMarkerContent color={m.color} glyph="★" />
+          </AdvancedMarker>
+        ))}
     </>
+  )
+}
+
+/** Compact action bubble shown on the selected marker (full map). */
+function PlaceBubble({
+  place,
+  index,
+  saved,
+  onFullDetails,
+  onSave,
+  onRoute,
+}: {
+  place: Place
+  index: number
+  saved: boolean
+  onFullDetails?: (place: Place) => void
+  onSave?: (place: Place) => void
+  onRoute?: (index: number) => void
+}) {
+  const btn =
+    'flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-[#F56A00]/50 hover:text-[#F56A00]'
+  return (
+    <div className="min-w-[170px] max-w-[240px] px-1 pb-1 pt-0.5">
+      <p className="mb-2 pr-5 text-[13px] font-semibold leading-snug text-gray-900">{place.name}</p>
+      <div className="flex items-center gap-1.5">
+        {onFullDetails && (
+          <button type="button" title="Full details & photos" className={btn} onClick={() => onFullDetails(place)}>
+            <ImageIcon className="h-4 w-4" />
+          </button>
+        )}
+        {onSave && (
+          <button
+            type="button"
+            title={saved ? 'Saved' : 'Save'}
+            className={`${btn} ${saved ? 'border-[#F56A00]/60 text-[#F56A00]' : ''}`}
+            onClick={() => onSave(place)}
+          >
+            <Star className={`h-4 w-4 ${saved ? 'fill-[#F56A00]' : ''}`} />
+          </button>
+        )}
+        {onRoute && (
+          <button type="button" title="Route from my location" className={btn} onClick={() => onRoute(index)}>
+            <Navigation className="h-4 w-4" />
+          </button>
+        )}
+        {place.website && (
+          <a href={place.website} target="_blank" rel="noopener noreferrer" title="Website" className={btn}>
+            <Globe className="h-4 w-4" />
+          </a>
+        )}
+        {place.maps_url && (
+          <a href={place.maps_url} target="_blank" rel="noopener noreferrer" title="Open in Google Maps" className={btn}>
+            <ExternalLink className="h-4 w-4" />
+          </a>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -1134,6 +1203,10 @@ function MapCanvas({
   onRouteError,
   zoomFocusOnActive = false,
   size = 'full',
+  onPlaceFullDetails,
+  onPlaceSave,
+  onPlaceRoute,
+  savedPlaceIds,
 }: Omit<Props, 'onExpand' | 'onCollapse' | 'selectedPlace' | 'loading' | 'error' | 'onRetry' | 'bottomSlot'>) {
   const markers = itinerary ?? places
   const markerCoords = markers
@@ -1164,6 +1237,14 @@ function MapCanvas({
   // 3D vector perspective by default in full mode; compact stays flat.
   const [mapMode, setMapMode] = useState<MapDisplayMode>('3d')
   const is3D = !isCompact && mapMode === '3d'
+
+  // Marker action bubble (full map): a small popup on the selected marker with
+  // quick actions, instead of slamming the full details panel open every click.
+  const [bubbleOpen, setBubbleOpen] = useState(true)
+  useEffect(() => { setBubbleOpen(true) }, [activeStopIndex])
+  const activePlace = activeStopIndex !== null ? markers[activeStopIndex] : null
+  const showBubble =
+    !isCompact && bubbleOpen && activeStopIndex !== null && !!activePlace && isValidCoord(activePlace.coordinates)
   // Only an explicit active selection triggers the cinematic glide — never
   // the initial fallback focus, so PreciseMapFit owns the first framing.
   const activePos =
@@ -1228,8 +1309,28 @@ function MapCanvas({
           colors={annotations?.colors}
         />
 
-        {annotations && annotations.markers.length > 0 && <AnnotationMarkers markers={annotations.markers} />}
+        {annotations && annotations.markers.length > 0 && (
+          <AnnotationMarkers markers={annotations.markers} placeCoords={markerCoords} />
+        )}
         {annotations && annotations.circles.length > 0 && <MapCircles circles={annotations.circles} />}
+
+        {showBubble && activePlace && (
+          <InfoWindow
+            position={activePlace.coordinates}
+            pixelOffset={[0, -46]}
+            headerDisabled
+            onCloseClick={() => setBubbleOpen(false)}
+          >
+            <PlaceBubble
+              place={activePlace as Place}
+              index={activeStopIndex as number}
+              saved={!!savedPlaceIds?.has((activePlace as Place).place_id)}
+              onFullDetails={onPlaceFullDetails}
+              onSave={onPlaceSave}
+              onRoute={onPlaceRoute}
+            />
+          </InfoWindow>
+        )}
 
         {itinerary && itinerary.length >= 2 && !routeFromUser && !customRoute && (
           <RoutePolyline stops={itinerary} />

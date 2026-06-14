@@ -40,9 +40,11 @@ interface Options {
   onTranscript: (text: string) => void
   disabled?: boolean
   autoResumeAfterSpeak?: boolean
+  /** Voice mode: use the browser recognizer for live text + instant (no-delay) echo. */
+  preferBrowserStt?: boolean
 }
 
-export function useVoice({ onTranscript, disabled, autoResumeAfterSpeak = true }: Options) {
+export function useVoice({ onTranscript, disabled, autoResumeAfterSpeak = true, preferBrowserStt }: Options) {
   const [state, dispatch] = useReducer(reducer, 'idle')
   const [supported, setSupported] = useState(true)
   const [warning, setWarning] = useState('')
@@ -55,6 +57,9 @@ export function useVoice({ onTranscript, disabled, autoResumeAfterSpeak = true }
   const suppressAutoResumeRef = useRef(false)
   const stateRef = useRef(state)
   stateRef.current = state
+  // Keep the latest value so startListening (a stable callback) reads it live.
+  const preferBrowserRef = useRef(preferBrowserStt)
+  preferBrowserRef.current = preferBrowserStt
 
   const stopListening = useCallback(async () => {
     const rec = recorderRef.current
@@ -94,7 +99,7 @@ export function useVoice({ onTranscript, disabled, autoResumeAfterSpeak = true }
     }
 
     try {
-      recorderRef.current = await startRecording()
+      recorderRef.current = await startRecording({ preferBrowser: preferBrowserRef.current })
       lastSpeechAtRef.current = performance.now()
       dispatch({ type: 'LISTEN' })
       emitActivity('listening', 0)

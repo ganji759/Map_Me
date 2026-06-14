@@ -338,8 +338,23 @@ function pickMimeType(): string | undefined {
   return undefined
 }
 
-/** Begin recording from the mic. Uses Gemini when configured, otherwise browser STT. */
-export async function startRecording(): Promise<Recorder> {
+/**
+ * Begin recording from the mic. Uses Gemini when configured, otherwise browser STT.
+ *
+ * `preferBrowser` forces the browser SpeechRecognition path (voice mode): it
+ * streams interim results so the user sees their words live, and `stop()`
+ * resolves instantly instead of round-tripping audio to Gemini — so the spoken
+ * message echoes into the chat with no delay. Falls back to the default path if
+ * the browser recognizer isn't available.
+ */
+export async function startRecording(opts?: { preferBrowser?: boolean }): Promise<Recorder> {
+  if (opts?.preferBrowser && createBrowserRecognizer()) {
+    try {
+      return await startBrowserSpeechRecording()
+    } catch {
+      /* fall back to the default path below */
+    }
+  }
   if (await shouldUseGeminiStt()) {
     return startGeminiRecording()
   }

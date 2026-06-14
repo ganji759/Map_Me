@@ -4,12 +4,12 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { MessageSquare, Mic } from 'lucide-react'
 import { ChatPanel } from '@/components/ChatPanel'
 import { MapView, type RouteInfo } from '@/components/MapView'
-import { PlaceListPanel } from '@/components/PlaceListPanel'
 import { PlaceCardStrip } from '@/components/PlaceCardStrip'
 import { CollapsedReply } from '@/components/CollapsedReply'
 import { PlaceDetailsPanel } from '@/components/PlaceDetailsPanel'
 import { streamChat, fetchSessionState, ChatGateError } from '@/lib/stream'
 import Paywall, { type GateState } from '@/components/Paywall'
+import { VoiceOrb } from '@/components/VoiceOrb'
 import { isValidCoord, pinsFarFromUser, requestUserLocation } from '@/lib/geo'
 import {
   applyMapActions,
@@ -220,6 +220,26 @@ export default function LandingPage() {
     if (places.some((p) => !p.photo_url && !p.photos?.length && photoCacheRef.current.has(p.place_id))) {
       setPlaces((prev) => applyCached(prev))
     }
+
+    // Mirror cached photos onto message places too — `msg.places` are set from
+    // the raw parse and never get enriched, so the in-chat gallery would show
+    // "No photo" without this. Only writes when something actually changed.
+    setMessages((prev) => {
+      let anyChanged = false
+      const next = prev.map((m) => {
+        if (!m.places?.length) return m
+        let msgChanged = false
+        const patched = m.places.map((p) => {
+          if (p.photo_url || p.photos?.length) return p
+          const urls = photoCacheRef.current.get(p.place_id)
+          if (urls?.length) { msgChanged = true; return { ...p, photo_url: urls[0], photos: urls } }
+          return p
+        })
+        if (msgChanged) { anyChanged = true; return { ...m, places: patched } }
+        return m
+      })
+      return anyChanged ? next : prev
+    })
 
     const toFetch = places.filter(
       (p) => p.place_id && !p.place_id.startsWith('__') && !p.photo_url && !p.photos?.length && !fetchedPhotoIdsRef.current.has(p.place_id),
@@ -604,17 +624,26 @@ export default function LandingPage() {
     setActiveStop(index)
     setMapZoomFocus(true)
     setMapVisible(true)
-    const list = itinerary?.stops ?? places
-    const item = list[index]
-    if (item) setDetailsPlace(item as Place)
-    // Selecting a place only focuses it and shows its details/photos — it does
-    // NOT draw a route. Clear any existing route so the map stays clean; the
-    // user starts a route explicitly via the card's Directions button.
+    // Selecting a place only focuses it and pops its action bubble on the map
+    // (Full details / Save / Route / Website). It does NOT open the full details
+    // panel anymore, and does NOT draw a route — keep the map clean.
     setRouteFromUser(false)
     setCustomRoute(null)
     setRouteInfo(null)
     setRouteError(null)
-  }, [places, itinerary])
+  }, [])
+
+  // Clicking a result card in the in-chat gallery: on the FULL map it just
+  // focuses that place's marker (the bubble gives full details); in compact mode
+  // it opens the details panel as before.
+  const handleGalleryCardClick = useCallback((place: Place) => {
+    if (mapExpanded) {
+      const list = (itinerary?.stops ?? places) as Place[]
+      const idx = list.findIndex((p) => p.place_id === place.place_id)
+      if (idx >= 0) { handleMarkerClick(idx); return }
+    }
+    setDetailsPlace(place)
+  }, [mapExpanded, itinerary, places, handleMarkerClick])
 
   const handleRouteFromMe = useCallback(async (index: number) => {
     setActiveStop(index)
@@ -836,6 +865,8 @@ export default function LandingPage() {
     onTranscript: voiceTranscriptCb,
     disabled: loading,
     autoResumeAfterSpeak: uiMode === 'voice',
+    // Voice mode: browser STT → live words + instant echo (no ~4s Gemini delay).
+    preferBrowserStt: uiMode === 'voice',
   })
 
   const stopEverything = useCallback(() => {
@@ -896,7 +927,7 @@ export default function LandingPage() {
       onExpandMap={() => { setMapVisible(true); setMapExpanded(true); setChatCollapsed(false) }}
       onCollapseMap={() => { setMapExpanded(false); setMapVisible(true); setChatCollapsed(false) }}
       onOpenMapFromMessage={handleOpenMapFromMessage}
-      onPlaceDetails={setDetailsPlace}
+      onPlaceDetails={handleGalleryCardClick}
       onToggleMapPanel={() => {
         setMapVisible((v) => {
           const next = !v
@@ -984,7 +1015,7 @@ export default function LandingPage() {
 
           {mapVisible && hasMapData && (
             <aside className="flex h-full w-[clamp(300px,32vw,420px)] shrink-0 flex-col border-l border-border bg-surface2/40 animate-slide-right">
-              <div className="relative h-[min(34vh,260px)] min-h-[180px] shrink-0 p-2">
+              <div className="relative min-h-[200px] flex-1 p-2">
                 <MapView
                   places={mapPlaces as Place[]}
                   itinerary={itineraryStops}
@@ -1018,28 +1049,8 @@ export default function LandingPage() {
                   Getting your location…
                 </div>
               )}
-              {!itineraryStops && places.length > 0 && (
-                <PlaceListPanel
-                  places={places}
-                  activeIndex={activeStop}
-                  onSelect={handleMarkerClick}
-                  onShowDetails={setDetailsPlace}
-                  onSave={handleSavePlace}
-                  onRouteFromMe={handleRouteFromMe}
-                  savedIds={savedPlaceIds}
-                />
-              )}
-              {itineraryStops && itineraryStops.length > 0 && (
-                <PlaceListPanel
-                  places={itineraryStops.map((s) => ({ ...s, personalization_score: 0, categories: [] })) as Place[]}
-                  activeIndex={activeStop}
-                  onSelect={handleMarkerClick}
-                  onShowDetails={(stop) => setDetailsPlace(stop)}
-                  onSave={handleSavePlace}
-                  onRouteFromMe={handleRouteFromMe}
-                  savedIds={savedPlaceIds}
-                />
-              )}
+              {/* Place results live ONLY in the chat now (InlinePlaceGallery under
+                  the AI reply). The right side keeps just the map. */}
             </aside>
           )}
         </div>
@@ -1064,6 +1075,10 @@ export default function LandingPage() {
             onRouteInfo={setRouteInfo}
             onRouteError={setRouteError}
             zoomFocusOnActive={mapZoomFocus}
+            onPlaceFullDetails={setDetailsPlace}
+            onPlaceSave={handleSavePlace}
+            onPlaceRoute={handleRouteFromMe}
+            savedPlaceIds={savedPlaceIds}
           />
           {pinsMismatch && (
             <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 max-w-md px-4 py-2 rounded-xl bg-surface/95 border border-gold/40 text-sm text-text backdrop-blur-md">
@@ -1168,6 +1183,22 @@ export default function LandingPage() {
       )}
 
       <Paywall gate={gate} onClose={() => setGate(null)} />
+
+      {/* Dedicated voice UI: a floating orb with the LIVE transcript of what the
+          user is saying (browser STT streams interim words) + speak controls. */}
+      {uiMode === 'voice' && (
+        <div className="fixed bottom-6 right-6 z-[60]">
+          <VoiceOrb
+            compact
+            state={voice.voiceState}
+            liveText={voice.liveText}
+            onToggle={voice.toggleVoice}
+            onPause={voice.pauseSpeaking}
+            onResume={voice.resumeSpeaking}
+            onStopSpeaking={voice.stopSpeakingAndListen}
+          />
+        </div>
+      )}
     </div>
   )
 }

@@ -30,8 +30,16 @@ function mapsLink(place: Place): string | null {
 export function InlinePlaceGallery({ places, onDetails }: Props) {
   if (!places?.length) return null
 
+  // Past ~4 cards (2 rows on desktop) cap the height and let it scroll
+  // vertically (up/down) so the gallery doesn't push the chat down endlessly.
+  const scrolls = places.length > 4
+
   return (
-    <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+    <div
+      className={`mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 ${
+        scrolls ? 'chat-scroll max-h-[58vh] overflow-y-auto pr-1' : ''
+      }`}
+    >
       {places.map((place, i) => {
         const href = mapsLink(place)
         return (
