@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import { ExternalLink, MapPin, Star } from 'lucide-react'
+import { ExternalLink, MapPin, Navigation, Star } from 'lucide-react'
 import type { Place } from '@/lib/types'
 import { PlaceImage } from './PlaceImage'
 
@@ -11,6 +11,8 @@ interface Props {
   activeIndex: number | null
   onSelect: (index: number) => void
   onShowDetails: (place: Place) => void
+  /** Explicit route-from-my-location — only runs when the user taps it. */
+  onRouteFromMe?: (index: number) => void
   leftOffset?: number
 }
 
@@ -26,7 +28,7 @@ function mapsLink(place: Place): string | null {
 }
 
 /** Horizontal place cards with photos — full-map bottom strip. */
-export function PlaceCardStrip({ places, activeIndex, onSelect, onShowDetails, leftOffset = 0 }: Props) {
+export function PlaceCardStrip({ places, activeIndex, onSelect, onShowDetails, onRouteFromMe, leftOffset = 0 }: Props) {
   const reduced = useReducedMotion()
   if (places.length === 0) return null
 
@@ -85,6 +87,17 @@ export function PlaceCardStrip({ places, activeIndex, onSelect, onShowDetails, l
                 >
                   Details
                 </button>
+                {onRouteFromMe && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onRouteFromMe(i) }}
+                    title="Route from my location"
+                    className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-text2 transition-colors hover:border-[#F56A00]/40 hover:text-[#F56A00]"
+                  >
+                    <Navigation className="h-3 w-3" />
+                    Route
+                  </button>
+                )}
                 {href && (
                   <a
                     href={href}

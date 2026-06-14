@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import { Bookmark, ExternalLink, MapPin, Star } from 'lucide-react'
+import { Bookmark, ExternalLink, MapPin, Navigation, Star } from 'lucide-react'
 import type { Place } from '@/lib/types'
 import { PlaceImage } from './PlaceImage'
 
@@ -12,6 +12,8 @@ interface Props {
   onSelect: (index: number) => void
   onShowDetails: (place: Place) => void
   onSave?: (place: Place) => void
+  /** Explicit route-from-my-location — only runs when the user taps it. */
+  onRouteFromMe?: (index: number) => void
   savedIds?: Set<string>
 }
 
@@ -26,7 +28,7 @@ function mapsLink(place: Place): string | null {
   return null
 }
 
-export function PlaceListPanel({ places, activeIndex, onSelect, onShowDetails, onSave, savedIds }: Props) {
+export function PlaceListPanel({ places, activeIndex, onSelect, onShowDetails, onSave, onRouteFromMe, savedIds }: Props) {
   const reduced = useReducedMotion()
   if (places.length === 0) return null
 
@@ -90,6 +92,17 @@ export function PlaceListPanel({ places, activeIndex, onSelect, onShowDetails, o
                     >
                       Details
                     </button>
+                    {onRouteFromMe && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onRouteFromMe(i) }}
+                        title="Route from my location"
+                        className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-text2 transition-colors hover:border-[#F56A00]/40 hover:text-[#F56A00]"
+                      >
+                        <Navigation className="h-3 w-3" />
+                        Route
+                      </button>
+                    )}
                     {onSave && (
                       <button
                         type="button"

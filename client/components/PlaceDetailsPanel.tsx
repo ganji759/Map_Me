@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Clock, ExternalLink, MapPin, Star } from 'lucide-react'
 import type { Place } from '@/lib/types'
 
@@ -112,12 +112,41 @@ export function PlaceDetailsPanel({
   fallbackPlace,
   onClose,
 }: Props) {
+  const [lbOpen, setLbOpen] = useState(false)
+  const [lbIndex, setLbIndex] = useState(0)
+
+  const openLightbox = useCallback((index: number) => {
+    setLbIndex(index)
+    setLbOpen(true)
+  }, [])
+
+  const closeLightbox = useCallback(() => setLbOpen(false), [])
+
   const initial = useMemo(
     () => (fallbackPlace ? buildFromFallback(fallbackPlace, fallbackMapsUrl) : null),
     [fallbackPlace, fallbackMapsUrl],
   )
   const [data, setData] = useState<PlaceData | null>(initial)
   const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading')
+
+  const lbPrev = useCallback(() => {
+    setLbIndex((i) => (i === 0 ? (data?.photoUrls.length ?? 1) - 1 : i - 1))
+  }, [data?.photoUrls.length])
+
+  const lbNext = useCallback(() => {
+    setLbIndex((i) => ((i + 1) % (data?.photoUrls.length ?? 1)))
+  }, [data?.photoUrls.length])
+
+  useEffect(() => {
+    if (!lbOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeLightbox()
+      else if (e.key === 'ArrowLeft') lbPrev()
+      else if (e.key === 'ArrowRight') lbNext()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [lbOpen, closeLightbox, lbPrev, lbNext])
 
   useEffect(() => {
     let cancelled = false
@@ -217,8 +246,9 @@ export function PlaceDetailsPanel({
             <img
               src={data.photoUrls[0]}
               alt={displayName}
-              className="h-full w-full object-cover"
+              className="h-full w-full cursor-zoom-in object-cover"
               loading="lazy"
+              onClick={() => openLightbox(0)}
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
@@ -245,8 +275,9 @@ export function PlaceDetailsPanel({
                 key={`${url}-${i}`}
                 src={url}
                 alt={`${displayName} photo ${i + 1}`}
-                className="h-14 w-20 shrink-0 rounded-lg object-cover"
+                className="h-14 w-20 shrink-0 cursor-zoom-in rounded-lg object-cover transition-opacity hover:opacity-80"
                 loading="lazy"
+                onClick={() => openLightbox(i)}
               />
             ))}
           </div>
@@ -351,6 +382,101 @@ export function PlaceDetailsPanel({
           )}
         </div>
       </div>
+      {lbOpen && data?.photoUrls?.length ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Photo lightbox"
+          className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/90"
+          onClick={closeLightbox}
+        >
+          {/* Main image — stop propagation so clicking image doesn't close */}
+          <div
+            className="relative flex w-full flex-1 items-center justify-center overflow-hidden px-14"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={data.photoUrls[lbIndex]}
+              alt={`${displayName} photo ${lbIndex + 1} of ${data.photoUrls.length}`}
+              className="max-h-[70vh] max-w-full object-contain motion-reduce:transition-none"
+              draggable={false}
+            />
+          </div>
+
+          {/* Counter */}
+          <div
+            className="absolute top-4 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-[13px] font-medium text-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {lbIndex + 1} / {data.photoUrls.length}
+          </div>
+
+          {/* Close button */}
+          <button
+            type="button"
+            aria-label="Close lightbox"
+            onClick={(e) => { e.stopPropagation(); closeLightbox() }}
+            className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+            </svg>
+          </button>
+
+          {/* Prev arrow */}
+          {data.photoUrls.length > 1 && (
+            <button
+              type="button"
+              aria-label="Previous photo"
+              onClick={(e) => { e.stopPropagation(); lbPrev() }}
+              className="absolute left-2 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-[#F56A00] disabled:opacity-30"
+            >
+              <svg viewBox="0 0 24 24" className="h-6 w-6 fill-current">
+                <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+              </svg>
+            </button>
+          )}
+
+          {/* Next arrow */}
+          {data.photoUrls.length > 1 && (
+            <button
+              type="button"
+              aria-label="Next photo"
+              onClick={(e) => { e.stopPropagation(); lbNext() }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-[#F56A00] disabled:opacity-30"
+            >
+              <svg viewBox="0 0 24 24" className="h-6 w-6 fill-current">
+                <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+              </svg>
+            </button>
+          )}
+
+          {/* Thumbnail strip */}
+          {data.photoUrls.length > 1 && (
+            <div
+              className="flex w-full gap-2 overflow-x-auto px-4 pb-4 pt-3 scrollbar-hide"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {data.photoUrls.map((url, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={`lb-thumb-${i}`}
+                  src={url}
+                  alt={`${displayName} photo ${i + 1}`}
+                  onClick={(e) => { e.stopPropagation(); setLbIndex(i) }}
+                  className={`h-14 w-20 shrink-0 cursor-pointer rounded-lg object-cover transition-opacity motion-reduce:transition-none ${
+                    i === lbIndex
+                      ? 'ring-2 ring-[#F56A00] opacity-100'
+                      : 'opacity-50 hover:opacity-80'
+                  }`}
+                  loading="lazy"
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
     </div>
   )
 }

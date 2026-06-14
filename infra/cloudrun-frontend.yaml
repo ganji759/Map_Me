@@ -15,7 +15,7 @@ spec:
       serviceAccountName: hodari-agent@mapsme-498314.iam.gserviceaccount.com
       containers:
       - name: hodari-frontend
-        image: us-central1-docker.pkg.dev/mapsme-498314/hodari/frontend@sha256:aa03f9dfac32bd64065697284f33402e1d5fd62816fbb3b40bdb102c9241e56a
+        image: us-central1-docker.pkg.dev/mapsme-498314/hodari/frontend@sha256:4b86c0c3da291b123647c95bf3a64b7997f294e21ffd48465d653f0c374d06fb
         ports:
         - containerPort: 3000
         resources:

@@ -584,12 +584,14 @@ export default function LandingPage() {
     const list = itinerary?.stops ?? places
     const item = list[index]
     if (item) setDetailsPlace(item as Place)
+    // Selecting a place only focuses it and shows its details/photos — it does
+    // NOT draw a route. Clear any existing route so the map stays clean; the
+    // user starts a route explicitly via the card's Directions button.
+    setRouteFromUser(false)
     setCustomRoute(null)
-    setRouteFromUser(true)
     setRouteInfo(null)
     setRouteError(null)
-    void ensureUserLocation()
-  }, [places, itinerary, ensureUserLocation])
+  }, [places, itinerary])
 
   const handleRouteFromMe = useCallback(async (index: number) => {
     setActiveStop(index)
@@ -999,6 +1001,7 @@ export default function LandingPage() {
                   onSelect={handleMarkerClick}
                   onShowDetails={setDetailsPlace}
                   onSave={handleSavePlace}
+                  onRouteFromMe={handleRouteFromMe}
                   savedIds={savedPlaceIds}
                 />
               )}
@@ -1009,6 +1012,7 @@ export default function LandingPage() {
                   onSelect={handleMarkerClick}
                   onShowDetails={(stop) => setDetailsPlace(stop)}
                   onSave={handleSavePlace}
+                  onRouteFromMe={handleRouteFromMe}
                   savedIds={savedPlaceIds}
                 />
               )}
@@ -1072,6 +1076,7 @@ export default function LandingPage() {
               activeIndex={activeStop}
               onSelect={handleMarkerClick}
               onShowDetails={setDetailsPlace}
+              onRouteFromMe={handleRouteFromMe}
               leftOffset={chatCollapsed ? 0 : chatWidth}
             />
           )}
@@ -1081,6 +1086,7 @@ export default function LandingPage() {
               activeIndex={activeStop}
               onSelect={handleMarkerClick}
               onShowDetails={(stop) => setDetailsPlace(stop)}
+              onRouteFromMe={handleRouteFromMe}
               leftOffset={chatCollapsed ? 0 : chatWidth}
             />
           )}

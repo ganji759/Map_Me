@@ -1006,14 +1006,10 @@ function MapMarkers({
           >
             {hl ? (
               <GlowMarkerContent color={hl} glyph={String(i + 1)} />
+            ) : isActive ? (
+              <GlowMarkerContent color={ROUTE_ORANGE} glyph={String(i + 1)} />
             ) : (
-              <Pin
-                background={isActive ? ROUTE_ORANGE : '#ffffff'}
-                borderColor={isActive ? '#C44A00' : ROUTE_ORANGE}
-                glyphColor={isActive ? '#ffffff' : ROUTE_ORANGE}
-                glyph={String(i + 1)}
-                scale={isActive ? 1.2 : 1}
-              />
+              <Pin background="#ffffff" borderColor={ROUTE_ORANGE} glyphColor={ROUTE_ORANGE} glyph={String(i + 1)} scale={1} />
             )}
           </AdvancedMarker>
         )
