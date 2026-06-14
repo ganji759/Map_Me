@@ -70,6 +70,31 @@ spec:
         # the Google OAuth client (avoids redirect_uri mismatch across URLs).
         - name: PUBLIC_BASE_URL
           value: https://hodari-frontend-377773225771.us-central1.run.app
+        # Audience for the Google ID token the frontend mints to call the agent
+        # service (so the agent can drop allUsers and accept only this SA).
+        # See BILLING.md → "Lock the agent endpoint".
+        - name: AGENT_AUDIENCE
+          value: https://hodari-agent-377773225771.us-central1.run.app
+        # ── Billing (Stripe) ─────────────────────────────────────────────────
+        # Stripe Price ids per credit pack (NOT secret — safe as plain values).
+        - name: STRIPE_PRICE_STARTER
+          value: price_REPLACE_ME_starter
+        - name: STRIPE_PRICE_EXPLORER
+          value: price_REPLACE_ME_explorer
+        - name: STRIPE_PRICE_TOURNAMENT
+          value: price_REPLACE_ME_tournament
+        # Secret keys — create these Secret Manager secrets, then UNCOMMENT.
+        # Until then the free tier works and the paywall shows "not enabled".
+        # - name: STRIPE_SECRET_KEY
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: STRIPE_SECRET_KEY
+        #       key: latest
+        # - name: STRIPE_WEBHOOK_SECRET
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: STRIPE_WEBHOOK_SECRET
+        #       key: latest
 
       # ── MongoDB MCP sidecar (for login route) ─────────────────────────────
       - name: mongodb-mcp

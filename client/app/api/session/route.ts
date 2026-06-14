@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { asId, getSessionUser } from '@/lib/session'
+import { adkAuthHeaders } from '@/lib/gcpAuth'
+
+export const runtime = 'nodejs'
 
 const ADK_BASE = process.env.ADK_BASE_URL ?? 'http://localhost:8000'
 const APP_NAME = process.env.ADK_APP_NAME ?? 'hodari'
@@ -19,6 +22,7 @@ export async function GET(req: NextRequest) {
 
   const res = await fetch(
     `${ADK_BASE}/apps/${APP_NAME}/users/${encodeURIComponent(userId)}/sessions/${encodeURIComponent(sessionId)}`,
+    { headers: await adkAuthHeaders() },
   )
 
   if (!res.ok) return NextResponse.json({}, { status: 200 })

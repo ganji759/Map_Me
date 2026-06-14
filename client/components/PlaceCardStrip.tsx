@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
-import { ExternalLink, MapPin, Navigation, Star } from 'lucide-react'
+import { ExternalLink, Globe, MapPin, Navigation, Star } from 'lucide-react'
 import type { Place } from '@/lib/types'
 import { PlaceImage } from './PlaceImage'
 
@@ -97,6 +97,19 @@ export function PlaceCardStrip({ places, activeIndex, onSelect, onShowDetails, o
                     <Navigation className="h-3 w-3" />
                     Route
                   </button>
+                )}
+                {place.website && (
+                  <a
+                    href={place.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    title="Restaurant website"
+                    className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-text2 transition-colors hover:border-[#F56A00]/40 hover:text-[#F56A00]"
+                  >
+                    <Globe className="h-3 w-3" />
+                    Site
+                  </a>
                 )}
                 {href && (
                   <a

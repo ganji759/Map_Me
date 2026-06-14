@@ -8,7 +8,8 @@ import { PlaceListPanel } from '@/components/PlaceListPanel'
 import { PlaceCardStrip } from '@/components/PlaceCardStrip'
 import { CollapsedReply } from '@/components/CollapsedReply'
 import { PlaceDetailsPanel } from '@/components/PlaceDetailsPanel'
-import { streamChat, fetchSessionState } from '@/lib/stream'
+import { streamChat, fetchSessionState, ChatGateError } from '@/lib/stream'
+import Paywall, { type GateState } from '@/components/Paywall'
 import { isValidCoord, pinsFarFromUser, requestUserLocation } from '@/lib/geo'
 import {
   applyMapActions,
@@ -115,6 +116,23 @@ interface HistoryItem {
 
 export default function LandingPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [gate, setGate] = useState<GateState | null>(null)
+
+  // Acknowledge a return from Stripe Checkout and strip the query param so a
+  // refresh doesn't re-trigger it. Credits land via the webhook; they apply on
+  // the next generation.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const purchase = new URLSearchParams(window.location.search).get('purchase')
+    if (!purchase) return
+    if (purchase === 'success') {
+      setMessages((prev) => [
+        ...prev,
+        { id: uid(), role: 'assistant', content: '✓ Payment received — your credits are ready. Ask away!' },
+      ])
+    }
+    window.history.replaceState({}, '', window.location.pathname)
+  }, [])
   const [userName] = useState(() =>
     typeof window !== 'undefined'
       ? (localStorage.getItem('hodari_name') || localStorage.getItem('hodari_email') || '')
@@ -531,7 +549,12 @@ export default function LandingPage() {
         if (idx !== null) setActiveStop(idx)
       }
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
+      if (err instanceof ChatGateError) {
+        // Quota gate (free previews used / out of credits): drop the empty
+        // assistant turn and open the login wall or paywall instead of an error.
+        setMessages((prev) => prev.filter((m) => m.content !== '' || m.role !== 'assistant'))
+        setGate({ type: err.gate, message: err.message })
+      } else if (err instanceof Error && err.name === 'AbortError') {
         // User stopped the request — leave whatever partial text is already in messages
       } else {
         console.error(err)
@@ -873,6 +896,7 @@ export default function LandingPage() {
       onExpandMap={() => { setMapVisible(true); setMapExpanded(true); setChatCollapsed(false) }}
       onCollapseMap={() => { setMapExpanded(false); setMapVisible(true); setChatCollapsed(false) }}
       onOpenMapFromMessage={handleOpenMapFromMessage}
+      onPlaceDetails={setDetailsPlace}
       onToggleMapPanel={() => {
         setMapVisible((v) => {
           const next = !v
@@ -1142,6 +1166,8 @@ export default function LandingPage() {
           onClose={() => setDetailsPlace(null)}
         />
       )}
+
+      <Paywall gate={gate} onClose={() => setGate(null)} />
     </div>
   )
 }

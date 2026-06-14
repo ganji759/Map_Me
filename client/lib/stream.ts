@@ -1,5 +1,17 @@
 import type { StreamChunk } from './types'
 
+/** Thrown when /api/chat refuses a run because the caller hit a quota gate. */
+export class ChatGateError extends Error {
+  gate: 'login' | 'paywall'
+  entitlement?: unknown
+  constructor(gate: 'login' | 'paywall', message: string, entitlement?: unknown) {
+    super(message)
+    this.name = 'ChatGateError'
+    this.gate = gate
+    this.entitlement = entitlement
+  }
+}
+
 const TOOL_LABELS: Record<string, string> = {
   load_user_profile: 'Loading your profile',
   map_control: 'Updating the map',
@@ -52,6 +64,11 @@ export async function* streamChat(
     const wait = retryAfter ? ` Try again in ${retryAfter}s.` : ''
     const msg = await res.json().then((d) => d?.error).catch(() => null)
     throw new Error((msg ?? 'Too many requests. Please slow down.') + wait)
+  }
+  if (res.status === 401 || res.status === 402) {
+    const d = await res.json().catch(() => ({}))
+    const gate: 'login' | 'paywall' = d?.gate === 'paywall' ? 'paywall' : res.status === 402 ? 'paywall' : 'login'
+    throw new ChatGateError(gate, d?.error ?? 'You’ve reached your limit.', d?.entitlement)
   }
   if (!res.ok || !res.body) {
     throw new Error(`Chat request failed: ${res.status}`)

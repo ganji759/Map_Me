@@ -22,13 +22,14 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react'
-import type { ChatMessage, Theme } from '@/lib/types'
+import type { ChatMessage, Place, Theme } from '@/lib/types'
 import type { MapSnapshot } from '@/lib/mapHistory'
 import type { VoiceState } from '@/hooks/useVoice'
 import { ModelSwitcher, type ModelId } from './ModelSwitcher'
 import { CollapsibleMessage } from './CollapsedReply'
 import { TypingIndicator } from './TypingIndicator'
 import { OpenMapButton } from './OpenMapButton'
+import { InlinePlaceGallery } from './InlinePlaceGallery'
 import { shownMessages } from '@/lib/animationMemory'
 
 interface Props {
@@ -58,6 +59,8 @@ interface Props {
   onExpandMap: () => void
   onCollapseMap: () => void
   onOpenMapFromMessage: (message: ChatMessage) => void
+  /** Opens the in-app place details panel from the inline chat gallery. */
+  onPlaceDetails?: (place: Place) => void
   onToggleMapPanel?: () => void
   selectedModel: ModelId
   onModelChange: (id: ModelId) => void
@@ -107,6 +110,7 @@ export function ChatPanel({
   onCollapseMap,
   mapExpanded,
   onOpenMapFromMessage,
+  onPlaceDetails,
   onToggleMapPanel,
   selectedModel,
   onModelChange,
@@ -388,6 +392,9 @@ export function ChatPanel({
                       Hodari is writing…
                     </p>
                   )}
+                  {msg.places?.length ? (
+                    <InlinePlaceGallery places={msg.places} onDetails={onPlaceDetails} />
+                  ) : null}
                   {(msg.places?.length || msg.itinerary?.stops?.length) ? (
                     <OpenMapButton
                       message={msg}

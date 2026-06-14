@@ -165,6 +165,11 @@ def _normalize_place(place: dict[str, Any]) -> dict[str, Any]:
             or links.get("placeUrl")
             or (place.get("attribution") or {}).get("url")
         ),
+        "website": (
+            place.get("website")
+            or place.get("websiteUri")
+            or place.get("websiteURI")
+        ),
         "open_now": open_now,
         "personalization_score": 0.0,
     }

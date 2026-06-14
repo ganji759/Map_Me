@@ -77,6 +77,7 @@ function buildFromFallback(place: Place, mapsUrl: string): PlaceData {
     photoUrls,
     address: place.address || undefined,
     summary: place.summary || undefined,
+    website: place.website || undefined,
     mapsUri: place.maps_url || mapsUrl,
     isOpen: null,
   }
@@ -169,7 +170,7 @@ export function PlaceDetailsPanel({
         address: api?.address ?? base.address,
         todayHours: api?.todayHours ?? base.todayHours,
         summary: base.summary ?? api?.summary,
-        website: base.website,
+        website: api?.website ?? base.website,
         phone: base.phone,
         mapsUri: api?.mapsUri ?? base.mapsUri ?? fallbackMapsUrl,
         isOpen: api?.isOpen ?? base.isOpen ?? null,
@@ -236,7 +237,7 @@ export function PlaceDetailsPanel({
       : null)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-up" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 animate-fade-up" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       <div className="relative flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-header)] shadow-2xl">
