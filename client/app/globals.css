@@ -378,6 +378,62 @@ body::before {
 .voice-orb-pulse  { animation: voice-orb-pulse  1s ease-in-out infinite; }
 .voice-orb-pulse-2 { animation: voice-orb-pulse-2 0.66s ease-in-out infinite; }
 
+/* ── AI-highlighted map markers ──────────────────────────────────────────────
+   Glowing, gently bouncing badge so an AI-marked place stands out clearly from
+   the plain numbered pins and Google's POI icons. Color comes from --mk. */
+.hodari-glow-marker {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  transform-origin: 50% 100%;
+  animation: hodari-marker-bounce 1.5s ease-in-out infinite;
+  cursor: pointer;
+}
+.hodari-glow-marker__ring {
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--mk, #1FA463);
+  opacity: 0.45;
+  animation: hodari-marker-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+.hodari-glow-marker__dot {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: var(--mk, #1FA463);
+  border: 2.5px solid #fff;
+  box-shadow: 0 3px 9px rgba(0, 0, 0, 0.4), 0 0 16px var(--mk, #1FA463);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1;
+}
+/* small downward pointer so it reads as a pin at the exact spot */
+.hodari-glow-marker__tip {
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 8px;
+  height: 8px;
+  background: var(--mk, #1FA463);
+  border-right: 2.5px solid #fff;
+  border-bottom: 2.5px solid #fff;
+  transform: translateX(-50%) rotate(45deg);
+}
+@keyframes hodari-marker-ping {
+  0%   { transform: scale(0.7); opacity: 0.55; }
+  70%  { transform: scale(1.7); opacity: 0; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+@keyframes hodari-marker-bounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-up,
   .animate-slide-right,
@@ -394,7 +450,9 @@ body::before {
   .voice-orb-pulse-2,
   .user-location-dot,
   .gold-ring,
-  .animate-history-drawer-in {
+  .animate-history-drawer-in,
+  .hodari-glow-marker,
+  .hodari-glow-marker__ring {
     animation: none !important;
   }
 }

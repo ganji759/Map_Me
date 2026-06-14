@@ -1005,7 +1005,7 @@ function MapMarkers({
             onClick={() => onMarkerClick(i)}
           >
             {hl ? (
-              <Pin background={hl} borderColor={hl} glyphColor="#ffffff" glyph={String(i + 1)} scale={isActive ? 1.25 : 1.1} />
+              <GlowMarkerContent color={hl} glyph={String(i + 1)} />
             ) : (
               <Pin
                 background={isActive ? ROUTE_ORANGE : '#ffffff'}
@@ -1022,44 +1022,99 @@ function MapMarkers({
   )
 }
 
+/**
+ * Glowing, gently bouncing marker for AI-highlighted places — visually distinct
+ * from the plain numbered pins and Google's POI icons, so a marked place pops.
+ */
+function GlowMarkerContent({ color, glyph }: { color: string; glyph: string }) {
+  return (
+    <div className="hodari-glow-marker" style={{ '--mk': color } as React.CSSProperties}>
+      <span className="hodari-glow-marker__ring" aria-hidden />
+      <span className="hodari-glow-marker__dot">{glyph}</span>
+      <span className="hodari-glow-marker__tip" aria-hidden />
+    </div>
+  )
+}
+
 /** Extra AI-placed markers (places not in the current list, e.g. an anchor). */
 function AnnotationMarkers({ markers }: { markers: MapAnnotations['markers'] }) {
   return (
     <>
       {markers.filter((m) => isValidCoord(m.coordinates)).map((m) => (
         <AdvancedMarker key={`anno-${m.id}`} position={m.coordinates} title={m.name} zIndex={7}>
-          <Pin background={m.color} borderColor={m.color} glyphColor="#ffffff" glyph="★" scale={1.15} />
+          <GlowMarkerContent color={m.color} glyph="★" />
         </AdvancedMarker>
       ))}
     </>
   )
 }
 
-/** Draws AI highlight circles with native google.maps.Circle overlays. */
+/**
+ * Draws AI highlight circles with native google.maps.Circle overlays. Each
+ * highlight gets a soft outer "glow" ring plus a crisp inner ring, and the pair
+ * gently pulses (unless reduced motion) so the highlighted area reads clearly.
+ */
 function MapCircles({ circles }: { circles: MapAnnotations['circles'] }) {
   const map = useMap()
   const ref = useRef<google.maps.Circle[]>([])
+  const rafRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (!map || typeof google === 'undefined') return
     ref.current.forEach((c) => c.setMap(null))
-    ref.current = circles
-      .filter((c) => isValidCoord(c.center) && c.radiusM > 0)
-      .map(
-        (c) =>
-          new google.maps.Circle({
-            map,
-            center: c.center,
-            radius: c.radiusM,
-            strokeColor: c.color,
-            strokeOpacity: 0.9,
-            strokeWeight: 2,
-            fillColor: c.color,
-            fillOpacity: 0.12,
-            clickable: false,
-          }),
+    if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
+
+    const valid = circles.filter((c) => isValidCoord(c.center) && c.radiusM > 0)
+    const created: google.maps.Circle[] = []
+    for (const c of valid) {
+      // Soft outer glow.
+      created.push(
+        new google.maps.Circle({
+          map,
+          center: c.center,
+          radius: c.radiusM,
+          strokeColor: c.color,
+          strokeOpacity: 0.35,
+          strokeWeight: 9,
+          fillColor: c.color,
+          fillOpacity: 0.08,
+          clickable: false,
+          zIndex: 1,
+        }),
       )
+      // Crisp inner ring.
+      created.push(
+        new google.maps.Circle({
+          map,
+          center: c.center,
+          radius: c.radiusM,
+          strokeColor: c.color,
+          strokeOpacity: 0.95,
+          strokeWeight: 2.5,
+          fillColor: c.color,
+          fillOpacity: 0.06,
+          clickable: false,
+          zIndex: 2,
+        }),
+      )
+    }
+    ref.current = created
+
+    if (!prefersReducedMotion() && created.length > 0) {
+      const start = performance.now()
+      const tick = (now: number) => {
+        const t = (now - start) / 1000
+        const wave = (Math.sin(t * 1.6) + 1) / 2 // 0..1
+        for (let i = 0; i < created.length; i += 2) {
+          created[i]?.setOptions({ strokeOpacity: 0.2 + wave * 0.3, strokeWeight: 7 + wave * 6 })
+        }
+        rafRef.current = requestAnimationFrame(tick)
+      }
+      rafRef.current = requestAnimationFrame(tick)
+    }
+
     return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current)
       ref.current.forEach((c) => c.setMap(null))
       ref.current = []
     }
