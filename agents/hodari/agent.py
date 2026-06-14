@@ -12,7 +12,7 @@ from .sub_agents.itinerary import itinerary_agent
 from .tools.map_control import map_control
 from .tools.maps_mcp import create_maps_toolset
 from .tools.fixtures import world_cup_venues
-from .tools.mongo_tools import load_user_profile, list_saved_places, save_place
+from .tools.mongo_tools import load_user_profile, list_saved_places, plan_visit, save_place
 from .tools.pipeline_tool import HodariPipelineTool
 from .plugins.profiling_plugin import create_profiling_plugin, profiling_enabled
 
@@ -156,6 +156,14 @@ When the user asks WHAT they've saved ("what's on my saved list?", "what did I s
   • Call list_saved_places and read back the names (and any planned visit dates) in a friendly line.
   • If it returns empty, tell them they haven't saved anything yet and how to save (ask you, or tap
     the bookmark icon on a place card).
+
+SCHEDULING A VISIT / MULTI-DAY PLANS (plan_visit):
+  • When the user says they'll go to a place on a date ("I'll visit Le Paris Paris on September 15",
+    "add this to my trip on the 20th", "book it for next Saturday"), call plan_visit with the place
+    and the date as YYYY-MM-DD. Resolve relative dates ("next Saturday", "this month") to an absolute
+    date yourself before calling. It appears on the in-app Plan calendar.
+  • For a multi-day trip, call plan_visit once per place/day, then summarise the day-by-day plan.
+  • Only confirm after the tool returns success.
 
 ═══ IN-APP MAP ═══
 
@@ -303,6 +311,7 @@ root_agent = LlmAgent(
         load_user_profile,
         map_control,
         save_place,
+        plan_visit,
         list_saved_places,
         world_cup_venues,
         create_maps_toolset(tools=["lookup_weather"]),

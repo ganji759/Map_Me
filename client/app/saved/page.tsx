@@ -21,14 +21,30 @@ interface PlaceDetails {
   isOpen?: boolean
 }
 
-function groupByMonth(items: SavedItem[]): Record<string, SavedItem[]> {
+function groupByDay(items: SavedItem[]): Record<string, SavedItem[]> {
   const groups: Record<string, SavedItem[]> = {}
   for (const item of items) {
     if (!item.visit_date) continue
-    const label = new Date(item.visit_date).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-    ;(groups[label] ??= []).push(item)
+    // Normalise to YYYY-MM-DD so the key is always sortable
+    const key = item.visit_date.slice(0, 10)
+    ;(groups[key] ??= []).push(item)
   }
   return groups
+}
+
+/** Returns a human-friendly relative hint, e.g. "Today", "Tomorrow", "in 5 days", "5 days ago". */
+function relativeDay(dateStr: string): string {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const target = new Date(dateStr + 'T00:00:00')
+  target.setHours(0, 0, 0, 0)
+  const diffDays = Math.round((target.getTime() - today.getTime()) / 86_400_000)
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Tomorrow'
+  if (diffDays === -1) return 'Yesterday'
+  if (diffDays > 1 && diffDays <= 30) return `in ${diffDays} days`
+  if (diffDays < -1 && diffDays >= -30) return `${Math.abs(diffDays)} days ago`
+  return ''
 }
 
 export default function SavedPage() {
@@ -85,8 +101,9 @@ export default function SavedPage() {
     setEditingReminder(null)
   }
 
-  const calendarGroups = groupByMonth(reminders)
+  const calendarGroups = groupByDay(reminders)
   const hasCalendar = Object.keys(calendarGroups).length > 0
+  const sortedDays = Object.keys(calendarGroups).sort()
 
   return (
     // h-screen + internal scroll: the global `html, body { overflow: hidden }`
@@ -263,67 +280,104 @@ export default function SavedPage() {
                 </button>
               </div>
             ) : (
-              <div className="space-y-8">
-                {Object.entries(calendarGroups)
-                  .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
-                  .map(([month, items]) => (
-                    <div key={month}>
-                      <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-amber-600 dark:text-amber-500">{month}</h2>
-                      <div className="space-y-2">
-                        {items
-                          .sort((a, b) => new Date(a.visit_date!).getTime() - new Date(b.visit_date!).getTime())
-                          .map((item) => {
-                            const d = details[item.place_id]
-                            const dt = new Date(item.visit_date!)
-                            return (
-                              <div key={item.place_id} className="flex items-center gap-4 rounded-2xl border border-amber-100/80 bg-white/70 p-4 shadow-sm dark:border-amber-900/30 dark:bg-[#15151a]/70">
-                                {/* Date badge */}
-                                <div className="flex h-14 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-amber-600 text-white">
-                                  <span className="text-[10px] font-medium uppercase">{dt.toLocaleDateString('en-US', { month: 'short' })}</span>
-                                  <span className="text-xl font-bold leading-none">{dt.getDate()}</span>
-                                </div>
+              <div className="space-y-10">
+                {sortedDays.map((dayKey, dayIndex) => {
+                  const items = calendarGroups[dayKey]
+                  const dt = new Date(dayKey + 'T00:00:00')
+                  const hint = relativeDay(dayKey)
+                  const isLast = dayIndex === sortedDays.length - 1
+                  return (
+                    <div key={dayKey} className="relative">
+                      {/* Vertical timeline rail — connects from this day down to the next */}
+                      {!isLast && (
+                        <div
+                          aria-hidden="true"
+                          className="absolute left-[22px] top-[52px] bottom-[-2.5rem] w-px bg-amber-200/60 dark:bg-amber-800/40 motion-reduce:hidden"
+                        />
+                      )}
 
-                                {/* Thumbnail */}
-                                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-amber-100 dark:bg-amber-900/20">
-                                  {d?.photoUrls?.[0] ? (
-                                    <img src={d.photoUrls[0]} alt={item.place_name} className="h-full w-full object-cover" />
-                                  ) : (
-                                    <div className="flex h-full w-full items-center justify-center">
-                                      <MapPin className="h-4 w-4 text-amber-300" />
-                                    </div>
-                                  )}
-                                </div>
+                      {/* Day header */}
+                      <div className="mb-3 flex items-baseline gap-3">
+                        {/* Timeline node dot */}
+                        <div
+                          aria-hidden="true"
+                          className="relative z-10 mt-[2px] h-3 w-3 shrink-0 rounded-full border-2 border-amber-600 bg-white dark:bg-[#15151a] motion-reduce:hidden"
+                          style={{ marginLeft: '16px' }}
+                        />
+                        <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-2">
+                          <h2 className="font-display text-[15px] font-semibold text-[#15151a] dark:text-amber-50">
+                            {dt.toLocaleDateString('en-US', { weekday: 'long' })}
+                            <span className="ml-1.5 font-normal text-amber-700/80 dark:text-amber-400/80">
+                              · {dt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                            </span>
+                          </h2>
+                          {hint && (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                              {hint}
+                            </span>
+                          )}
+                          <span className="ml-auto shrink-0 text-[10px] font-medium uppercase tracking-wider text-amber-500 dark:text-amber-600">
+                            {items.length} {items.length === 1 ? 'stop' : 'stops'}
+                          </span>
+                        </div>
+                      </div>
 
-                                {/* Details */}
-                                <div className="min-w-0 flex-1">
-                                  <p className="truncate font-medium text-[14px] text-[#15151a] dark:text-amber-50">{item.place_name}</p>
-                                  <p className="text-[11px] text-amber-700/70 dark:text-amber-500/70">
-                                    {dt.toLocaleDateString('en-US', { weekday: 'long' })}
-                                    {item.city ? ` · ${item.city}` : ''}
-                                  </p>
-                                  {item.note && <p className="mt-0.5 truncate text-[11px] italic text-amber-600/70 dark:text-amber-500/70">{item.note}</p>}
-                                </div>
-
-                                {/* Remove */}
-                                <button
-                                  onClick={async () => {
-                                    await fetch('/api/saved', {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ userId, placeId: item.place_id, placeName: item.place_name, city: item.city, visitDate: null, note: '' }),
-                                    })
-                                    setReminders((prev) => prev.filter((r) => r.place_id !== item.place_id))
-                                  }}
-                                  className="shrink-0 rounded-lg p-2 text-amber-300 transition-colors hover:text-amber-600 dark:text-amber-800 dark:hover:text-amber-500"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
+                      {/* Cards for this day */}
+                      <div className="space-y-2 pl-8">
+                        {items.map((item) => {
+                          const d = details[item.place_id]
+                          const itemDt = new Date(item.visit_date!)
+                          return (
+                            <div key={item.place_id} className="flex items-center gap-4 rounded-2xl border border-amber-100/80 bg-white/70 p-4 shadow-sm dark:border-amber-900/30 dark:bg-[#15151a]/70">
+                              {/* Date badge */}
+                              <div className="flex h-14 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-amber-600 text-white">
+                                <span className="text-[10px] font-medium uppercase">{itemDt.toLocaleDateString('en-US', { month: 'short' })}</span>
+                                <span className="text-xl font-bold leading-none">{itemDt.getDate()}</span>
                               </div>
-                            )
-                          })}
+
+                              {/* Thumbnail */}
+                              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-amber-100 dark:bg-amber-900/20">
+                                {d?.photoUrls?.[0] ? (
+                                  <img src={d.photoUrls[0]} alt={item.place_name} className="h-full w-full object-cover" />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center">
+                                    <MapPin className="h-4 w-4 text-amber-300" />
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Details */}
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate font-medium text-[14px] text-[#15151a] dark:text-amber-50">{item.place_name}</p>
+                                <p className="text-[11px] text-amber-700/70 dark:text-amber-500/70">
+                                  {itemDt.toLocaleDateString('en-US', { weekday: 'long' })}
+                                  {item.city ? ` · ${item.city}` : ''}
+                                </p>
+                                {item.note && <p className="mt-0.5 truncate text-[11px] italic text-amber-600/70 dark:text-amber-500/70">{item.note}</p>}
+                              </div>
+
+                              {/* Remove */}
+                              <button
+                                aria-label={`Remove ${item.place_name} from plan`}
+                                onClick={async () => {
+                                  await fetch('/api/saved', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ userId, placeId: item.place_id, placeName: item.place_name, city: item.city, visitDate: null, note: '' }),
+                                  })
+                                  setReminders((prev) => prev.filter((r) => r.place_id !== item.place_id))
+                                }}
+                                className="shrink-0 rounded-lg p-2 text-amber-300 transition-colors hover:text-amber-600 dark:text-amber-800 dark:hover:text-amber-500"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          )
+                        })}
                       </div>
                     </div>
-                  ))}
+                  )
+                })}
               </div>
             )}
           </div>

@@ -80,7 +80,10 @@ venue" annotation.
 **Files:** `components/MapView.tsx`, `lib/mapActions.ts`, `tools/map_control.py`.
 **Effort:** M.
 
-## Phase 8 — Multi-day trip planning → saved calendar  ☐
+## Phase 8 — Multi-day trip planning → saved calendar  ☑ (shipped 2026-06-14)
+Agent gains plan_visit (writes a dated reminder via MCP). The /saved "Plan" tab
+was rebuilt into a day-by-day timeline (grouped by date, relative hints, stop
+counts, timeline rail). The saved-page UI was built by a delegated subagent.
 **Why:** Real trips span the tournament (e.g. a September visit), not one afternoon.
 **How:** Agent builds a day-by-day plan and writes dated entries to the existing
 `/saved` calendar (reminders with `visit_date`). Surface as a multi-day view.
@@ -93,6 +96,8 @@ Marked out-of-MVP in `CLAUDE.md`; revisit as a real "Phase 2" once the above lan
 **Effort:** L+.
 
 ---
+
+## Summary — Phases 1–8 shipped (2026-06-13/14). Phase 9 deferred per MVP scope.
 
 ## Progress log
 - 2026-06-13: Roadmap created. Building Phase 1 (weather) first.

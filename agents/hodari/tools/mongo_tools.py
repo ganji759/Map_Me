@@ -451,6 +451,64 @@ def save_place(
         return "I couldn't save that just now. Please try again in a moment."
 
 
+def plan_visit(
+    place_name: str,
+    visit_date: str,
+    tool_context: ToolContext,
+    note: str = "",
+    place_id: str = "",
+) -> str:
+    """Schedule a visit to a place on a specific date — adds it to the user's
+    Saved Places "Plan" calendar.
+
+    Call this when the user says they will go somewhere on a date ("I'll visit
+    Le Paris Paris on September 15", "add this to my trip on the 20th", "plan to
+    eat here next Saturday"). The entry then shows on the in-app calendar.
+
+    Args:
+        place_name: Name of the place, as shown to the user.
+        visit_date: The visit date as YYYY-MM-DD (resolve relative dates like
+            "next Saturday" to an absolute date first).
+        note:       Optional note (e.g. "lunch before the match").
+        place_id:   Google Place ID if known (resolved from results otherwise).
+        tool_context: Injected by ADK.
+    """
+    from datetime import datetime, timezone
+
+    uid = _user_id(tool_context)
+    pid, name, resolved_city = _resolve_place(tool_context, place_name, place_id)
+    if not pid:
+        return (
+            f"I couldn't find {place_name or 'that place'} to schedule. "
+            "Ask me to find it first, then I can add it to your plan."
+        )
+    if not visit_date or not re.match(r"^\d{4}-\d{2}-\d{2}", visit_date.strip()):
+        return "I need the visit date as YYYY-MM-DD to add it to your plan."
+    try:
+        _mcp_tool("update-many", {
+            "database": HODARI_DB,
+            "collection": "interactions",
+            "filter": {"user_id": uid, "place_id": pid, "action": "reminder"},
+            "update": {
+                "$set": {
+                    "user_id": uid,
+                    "place_id": pid,
+                    "place_name": name or place_name,
+                    "city": resolved_city,
+                    "action": "reminder",
+                    "visit_date": visit_date.strip()[:10],
+                    "note": note,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            },
+            "upsert": True,
+        })
+        return f"Added {name or place_name} to your plan for {visit_date.strip()[:10]}."
+    except Exception as exc:
+        logger.warning("plan_visit failed: %s", exc)
+        return "I couldn't schedule that just now. Please try again in a moment."
+
+
 def list_saved_places(tool_context: ToolContext) -> list[dict]:
     """List the places the user has saved (their Saved Places page contents).
 
