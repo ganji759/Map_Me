@@ -206,6 +206,9 @@ export default function LandingPage() {
   // URLs are kept in a cache keyed by place_id and re-applied after every
   // overwrite — the key below flips whenever a visible place loses its photo.
   const photoCacheRef = useRef(new Map<string, string[]>())
+  // Calendar events already surfaced as chips (keyed place_id:date) — avoids
+  // re-showing the same scheduled visit on later turns.
+  const shownCalendarKeysRef = useRef(new Set<string>())
   const placePhotoKey = places
     .map((p) => `${p.place_id}:${p.photo_url || p.photos?.length ? 1 : 0}`)
     .join(',')
@@ -517,6 +520,24 @@ export default function LandingPage() {
         processSessionMapActions(state)
         if (state.suppress_gps_context === '1') setSuppressGpsContext(true)
         else if (state.suppress_gps_context === '') setSuppressGpsContext(false)
+
+        // Scheduled visits (plan_visit) → attach "Add to Google Calendar" chips to
+        // the reply. Track shown events by place+date so they don't re-appear.
+        const calRaw = Array.isArray(state.calendar_events) ? state.calendar_events as Array<Record<string, unknown>> : []
+        const freshCal = calRaw
+          .map((e) => ({ title: String(e.title ?? ''), date: String(e.date ?? ''), location: (e.location as string) || undefined, description: (e.note as string) || undefined, placeId: String(e.place_id ?? '') }))
+          .filter((e) => e.title && e.date && !shownCalendarKeysRef.current.has(`${e.placeId}:${e.date}`))
+        if (freshCal.length) {
+          freshCal.forEach((e) => shownCalendarKeysRef.current.add(`${e.placeId}:${e.date}`))
+          setMessages((prev) => {
+            const ri = [...prev].reverse().findIndex((m) => m.role === 'assistant')
+            if (ri === -1) return prev
+            const ai = prev.length - 1 - ri
+            return prev.map((m, i) => i === ai
+              ? { ...m, calendarEvents: freshCal.map(({ title, date, location, description }) => ({ title, date, location, description })) }
+              : m)
+          })
+        }
 
         if ((pipelineRan && !earlyItinerarySet) || wantsMap) {
           const intent = state.intent_type as string | undefined

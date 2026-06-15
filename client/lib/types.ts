@@ -55,6 +55,8 @@ export interface ChatMessage {
   content: string
   places?: Place[]
   itinerary?: Itinerary | null
+  /** Scheduled visits from plan_visit → "Add to Google Calendar" chips in chat. */
+  calendarEvents?: import('./calendar').CalendarEvent[]
 }
 
 export type StreamChunk =

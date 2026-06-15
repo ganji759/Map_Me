@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Bookmark, Calendar, MapPin, Trash2 } from 'lucide-react'
+import { ArrowLeft, Bookmark, Calendar, CalendarPlus, Check, MapPin, Trash2 } from 'lucide-react'
+import { googleCalendarUrl } from '@/lib/calendar'
 
 interface SavedItem {
   place_id: string
@@ -55,9 +56,38 @@ export default function SavedPage() {
   const [tab, setTab] = useState<'places' | 'calendar'>('places')
   const [editingReminder, setEditingReminder] = useState<string | null>(null)
   const [reminderInputs, setReminderInputs] = useState<Record<string, { date: string; note: string }>>({})
+  const [calendarConnected, setCalendarConnected] = useState(false)
+  const [addedToCal, setAddedToCal] = useState<Set<string>>(new Set())
   const fetchedRef = useRef(new Set<string>())
 
   const userId = typeof window !== 'undefined' ? (localStorage.getItem('hodari_uid') ?? '') : ''
+
+  useEffect(() => {
+    fetch('/api/calendar/status').then((r) => r.json()).then((d) => setCalendarConnected(!!d?.connected)).catch(() => {})
+  }, [])
+
+  // Add a planned visit to Google Calendar. If the user connected their calendar
+  // we insert silently; otherwise we open the prefilled "add event" template
+  // (works for everyone, no scopes).
+  const addVisitToCalendar = async (item: SavedItem) => {
+    const ev = {
+      title: item.place_name,
+      date: (item.visit_date ?? '').slice(0, 10),
+      location: item.city || undefined,
+      description: item.note || `Planned with Hodari`,
+    }
+    if (!ev.date) return
+    if (calendarConnected) {
+      try {
+        const r = await fetch('/api/calendar/add', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ev),
+        }).then((res) => res.json())
+        if (r?.added) { setAddedToCal((prev) => new Set(prev).add(item.place_id)); return }
+        // needsConnect → fall through to the template link
+      } catch { /* fall through */ }
+    }
+    window.open(googleCalendarUrl(ev), '_blank', 'noopener')
+  }
 
   useEffect(() => {
     if (!userId) { setLoading(false); return }
@@ -281,6 +311,20 @@ export default function SavedPage() {
               </div>
             ) : (
               <div className="space-y-10">
+                {!calendarConnected && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/60 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+                    <p className="text-[13px] text-amber-800 dark:text-amber-300">
+                      Connect Google Calendar for one-tap sync, or just use the <strong>Calendar</strong> button on each visit.
+                    </p>
+                    <a
+                      href="/api/auth/google?calendar=1&next=/saved"
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-600 px-4 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-amber-700"
+                    >
+                      <CalendarPlus className="h-3.5 w-3.5" />
+                      Connect Google Calendar
+                    </a>
+                  </div>
+                )}
                 {sortedDays.map((dayKey, dayIndex) => {
                   const items = calendarGroups[dayKey]
                   const dt = new Date(dayKey + 'T00:00:00')
@@ -355,6 +399,23 @@ export default function SavedPage() {
                                 </p>
                                 {item.note && <p className="mt-0.5 truncate text-[11px] italic text-amber-600/70 dark:text-amber-500/70">{item.note}</p>}
                               </div>
+
+                              {/* Add to Google Calendar */}
+                              {addedToCal.has(item.place_id) ? (
+                                <span className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-green-600 dark:text-green-400">
+                                  <Check className="h-3.5 w-3.5" /> Added
+                                </span>
+                              ) : (
+                                <button
+                                  aria-label={`Add ${item.place_name} to Google Calendar`}
+                                  title="Add to Google Calendar"
+                                  onClick={() => addVisitToCalendar(item)}
+                                  className="flex shrink-0 items-center gap-1 rounded-lg border border-amber-200 px-2.5 py-1.5 text-[11px] font-medium text-amber-700 transition-colors hover:border-amber-400 hover:bg-amber-50 dark:border-amber-900/40 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                                >
+                                  <CalendarPlus className="h-3.5 w-3.5" />
+                                  Calendar
+                                </button>
+                              )}
 
                               {/* Remove */}
                               <button

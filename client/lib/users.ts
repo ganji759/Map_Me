@@ -3,6 +3,7 @@
  * OAuth callback. Matches the existing `users` collection schema.
  */
 import { mcpSession, mcpCall, ensureConnected, extractDocs } from '@/lib/mcp'
+import { encryptSecret, decryptSecret } from '@/lib/crypto'
 
 const DB = process.env.MONGODB_DATABASE ?? 'hodari'
 
@@ -66,4 +67,36 @@ export async function findOrCreateUser(email: string, name: string): Promise<Hod
   }
   await mcpCall(sid, 'insert-many', { database: DB, collection: 'users', documents: [doc] })
   return publicUser(doc)
+}
+
+/** Store the user's Google refresh token (encrypted) + mark calendar connected. */
+export async function setGoogleRefreshToken(userId: string, refreshToken: string): Promise<void> {
+  const sid = await mcpSession()
+  await ensureConnected(sid)
+  await mcpCall(sid, 'update-many', {
+    database: DB,
+    collection: 'users',
+    filter: { user_id: userId },
+    update: { $set: { google_refresh_token: encryptSecret(refreshToken), google_calendar_connected: true } },
+  })
+}
+
+/** The decrypted Google refresh token for a user, or null if not connected. */
+export async function getGoogleRefreshToken(userId: string): Promise<string | null> {
+  const sid = await mcpSession()
+  await ensureConnected(sid)
+  const docs = extractDocs(
+    await mcpCall(sid, 'find', { database: DB, collection: 'users', filter: { user_id: userId }, limit: 1 }),
+  )
+  return decryptSecret(docs[0]?.google_refresh_token as string | undefined)
+}
+
+/** Whether the user has connected Google Calendar. */
+export async function isCalendarConnected(userId: string): Promise<boolean> {
+  const sid = await mcpSession()
+  await ensureConnected(sid)
+  const docs = extractDocs(
+    await mcpCall(sid, 'find', { database: DB, collection: 'users', filter: { user_id: userId }, limit: 1 }),
+  )
+  return Boolean(docs[0]?.google_calendar_connected)
 }

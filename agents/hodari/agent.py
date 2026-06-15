@@ -14,6 +14,7 @@ from .tools.maps_mcp import create_maps_toolset
 from .tools.fixtures import world_cup_venues
 from .tools.mongo_tools import load_user_profile, list_saved_places, plan_visit, save_place
 from .tools.pipeline_tool import HodariPipelineTool
+from .tools.web_search import create_web_search_tool
 from .plugins.profiling_plugin import create_profiling_plugin, profiling_enabled
 
 
@@ -163,7 +164,8 @@ SCHEDULING A VISIT / MULTI-DAY PLANS (plan_visit):
     and the date as YYYY-MM-DD. Resolve relative dates ("next Saturday", "this month") to an absolute
     date yourself before calling. It appears on the in-app Plan calendar.
   • For a multi-day trip, call plan_visit once per place/day, then summarise the day-by-day plan.
-  • Only confirm after the tool returns success.
+  • Only confirm after the tool returns success. After scheduling, mention they can tap
+    "Add to Google Calendar" (it appears under your reply and on the Saved → Plan page) to sync it.
 
 ═══ IN-APP MAP ═══
 
@@ -282,6 +284,25 @@ Keep it brief and practical (e.g. "Light rain expected around 3pm, so I'd do the
 museum first and the terrace dinner after it clears"). Never invent a forecast —
 if lookup_weather fails, say you couldn't fetch it rather than guessing.
 
+═══ WEB SEARCH (web_search) ═══
+
+Call web_search for TIME-SENSITIVE facts you can't know from memory and that the
+Maps pipeline doesn't cover. Stay in CONVERSATION; do NOT run hodari_pipeline for these.
+Use it for:
+  • Events / festivals / concerts / exhibitions happening on a date ("anything on in
+    Paris this weekend?", "is there a festival near the stadium Saturday?").
+  • Transit disruptions, strikes, line closures, public holidays affecting travel.
+  • News or current status ("is the Eiffel Tower open today?", "any delays on the metro?").
+  • Today's opening hours or current prices when the user needs them right now and the
+    place data doesn't have them.
+
+Do NOT use web_search to discover places to eat/visit — that is hodari_pipeline's job
+(grounded in Maps). Use web_search for the live, in-the-moment layer on top.
+
+After it returns: weave the answer into natural conversation, keep it concise, and
+attribute briefly when useful ("per the city's transit site"). If it found nothing or
+failed, say so plainly — never invent events, schedules, or prices.
+
 ═══ FOLLOW-UPS (stay in CONVERSATION) ═══
 
 For questions about places already in the current candidates or itinerary ("tell me more about X",
@@ -315,6 +336,7 @@ root_agent = LlmAgent(
         list_saved_places,
         world_cup_venues,
         create_maps_toolset(tools=["lookup_weather"]),
+        create_web_search_tool(),
         HodariPipelineTool(agent=_pipeline),
     ],
 )

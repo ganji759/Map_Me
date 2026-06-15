@@ -36,5 +36,6 @@ export async function GET(req: NextRequest) {
     intent_type: session?.state?.intent_type,
     map_actions: session?.state?.map_actions,
     suppress_gps_context: session?.state?.suppress_gps_context,
+    calendar_events: session?.state?.calendar_events,
   })
 }

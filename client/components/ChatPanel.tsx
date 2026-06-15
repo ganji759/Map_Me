@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   Bookmark,
+  CalendarPlus,
   ChevronDown,
   History,
   LogOut,
@@ -30,6 +31,7 @@ import { CollapsibleMessage } from './CollapsedReply'
 import { TypingIndicator } from './TypingIndicator'
 import { OpenMapButton } from './OpenMapButton'
 import { InlinePlaceGallery } from './InlinePlaceGallery'
+import { googleCalendarUrl } from '@/lib/calendar'
 import { shownMessages } from '@/lib/animationMemory'
 
 interface Props {
@@ -394,6 +396,22 @@ export function ChatPanel({
                   )}
                   {msg.places?.length ? (
                     <InlinePlaceGallery places={msg.places} onDetails={onPlaceDetails} />
+                  ) : null}
+                  {msg.calendarEvents?.length ? (
+                    <div className="mt-2.5 flex flex-wrap gap-2">
+                      {msg.calendarEvents.map((ev, i) => (
+                        <a
+                          key={`${ev.title}-${i}`}
+                          href={googleCalendarUrl(ev)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-header)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:border-[#F56A00]/40 hover:text-[#F56A00]"
+                        >
+                          <CalendarPlus className="h-3.5 w-3.5" />
+                          Add “{ev.title}” to Calendar
+                        </a>
+                      ))}
+                    </div>
                   ) : null}
                   {(msg.places?.length || msg.itinerary?.stops?.length) ? (
                     <OpenMapButton

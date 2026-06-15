@@ -503,6 +503,22 @@ def plan_visit(
             },
             "upsert": True,
         })
+        # Surface the scheduled visit to the client so it can offer an
+        # "Add to Google Calendar" action in the chat (see lib/calendar.ts).
+        try:
+            existing = tool_context.state.get("calendar_events") or []
+            tool_context.state["calendar_events"] = [
+                *existing,
+                {
+                    "title": name or place_name,
+                    "date": visit_date.strip()[:10],
+                    "location": resolved_city or "",
+                    "note": note or "",
+                    "place_id": pid,
+                },
+            ]
+        except Exception:
+            pass
         return f"Added {name or place_name} to your plan for {visit_date.strip()[:10]}."
     except Exception as exc:
         logger.warning("plan_visit failed: %s", exc)
