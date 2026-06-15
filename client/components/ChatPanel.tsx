@@ -29,7 +29,7 @@ import type { MapSnapshot } from '@/lib/mapHistory'
 import type { VoiceState } from '@/hooks/useVoice'
 import { ModelSwitcher, type ModelId } from './ModelSwitcher'
 import { CollapsibleMessage } from './CollapsedReply'
-import { TypingIndicator } from './TypingIndicator'
+import { TypingIndicator, ThinkingTrace } from './TypingIndicator'
 import { OpenMapButton } from './OpenMapButton'
 import { InlinePlaceGallery } from './InlinePlaceGallery'
 import { googleCalendarUrl } from '@/lib/calendar'
@@ -94,6 +94,7 @@ const CHIPS = [
 export function ChatPanel({
   messages,
   loading,
+  thinkingSteps,
   streamingStarted,
   onSend,
   voiceState = 'idle',
@@ -482,7 +483,7 @@ export function ChatPanel({
                   Hodari
                 </p>
                 <div className="animate-fade-up">
-                  <TypingIndicator />
+                  <ThinkingTrace steps={thinkingSteps} />
                 </div>
               </div>
             </div>

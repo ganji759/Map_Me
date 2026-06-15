@@ -1110,6 +1110,7 @@ export default function LandingPage() {
                   onRouteInfo={setRouteInfo}
                   onRouteError={setRouteError}
                   zoomFocusOnActive={mapZoomFocus}
+                  aiBusy={loading}
                   size="compact"
                   hideInlinePlaceCard
                   onExpand={() => { setMapExpanded(true); setMapVisible(true); setChatCollapsed(false) }}
@@ -1154,6 +1155,7 @@ export default function LandingPage() {
             onRouteInfo={setRouteInfo}
             onRouteError={setRouteError}
             zoomFocusOnActive={mapZoomFocus}
+            aiBusy={loading}
             onPlaceFullDetails={setDetailsPlace}
             onPlaceSave={handleSavePlace}
             onPlaceRoute={handleRouteFromMe}

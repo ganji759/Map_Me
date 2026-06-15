@@ -50,6 +50,10 @@ function prefersReducedMotion(): boolean {
 /** Standard light roadmap — no orange tint on land/water (orange only on route + pins). */
 const MAP_STYLES: google.maps.MapTypeStyle[] = [
   { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+  // Hide Google's own business POI pins/labels so only our curated markers show.
+  // Otherwise a clicked place pops OUR bouncing pin while Google's static POI
+  // marker stays underneath it — reading as two markers at the same spot.
+  { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
 ]
 
 function boundsSpanKm(bounds: google.maps.LatLngBounds): number {
@@ -152,6 +156,9 @@ interface Props {
   onRouteError?: (message: string | null) => void
   zoomFocusOnActive?: boolean
   size?: MapViewSize
+  /** True while the AI is still generating — suppresses the cinematic camera
+   *  glide/orbit/fly until the task finishes, so it doesn't fight the user. */
+  aiBusy?: boolean
   onExpand?: () => void
   onCollapse?: () => void
   selectedPlace?: Place | null
@@ -989,6 +996,11 @@ function MapMarkers({
   /** place_id -> color, recolors the AI-highlighted pins. */
   colors?: Record<string, string>
 }) {
+  // Track coordinates already drawn so a duplicate entry (same place returned
+  // twice, or a stop that repeats a place) doesn't stack a second static pin
+  // under the active/glowing one — the "two markers, one bouncing one not" bug.
+  const seenCoords = new Set<string>()
+
   return (
     <>
       {showUserLocation && userLocation && isValidCoord(userLocation) && (
@@ -1003,6 +1015,13 @@ function MapMarkers({
         const isActive = activeStopIndex === i
         const pid = 'place_id' in item ? item.place_id : ''
         const hl = pid ? colors[pid] : undefined
+
+        // A plain (inactive, un-highlighted) pin that sits exactly on top of a
+        // marker we've already rendered is a visual duplicate — skip it.
+        const coordKey = isValidCoord(coords) ? `${coords.lat.toFixed(5)},${coords.lng.toFixed(5)}` : ''
+        const dup = coordKey !== '' && seenCoords.has(coordKey)
+        if (coordKey) seenCoords.add(coordKey)
+        if (dup && !isActive && !hl) return null
 
         return (
           <AdvancedMarker
@@ -1229,11 +1248,13 @@ function Map3DView({
   activeStopIndex,
   onMarkerClick,
   annotations,
+  aiBusy = false,
 }: {
   markers: (Place | ItineraryStop)[]
   activeStopIndex: number | null
   onMarkerClick: (index: number) => void
   annotations?: MapAnnotations
+  aiBusy?: boolean
 }) {
   const first = markers.find((m) => isValidCoord(m.coordinates))?.coordinates
   const center: google.maps.LatLngAltitudeLiteral = first
@@ -1272,8 +1293,115 @@ function Map3DView({
       ))}
       {/* AI-drawn circles — rendered as ground polygons so they show in 3D too. */}
       <Circles3D circles={annotations?.circles ?? []} />
-      <Fly3DToActive markers={markers} activeStopIndex={activeStopIndex} />
+      <Fly3DToActive markers={markers} activeStopIndex={activeStopIndex} enabled={!aiBusy} />
     </Map3D>
+  )
+}
+
+/**
+ * Floating photo + details card for the photorealistic ("Realistic") map. The
+ * Map3DElement can't host an InfoWindow like the vector map's PlaceBubble, so a
+ * clicked marker had no detail box in 3D. This overlay restores parity: it
+ * shows the selected place's photos, name, rating and the same quick actions.
+ */
+function RealisticPlaceCard({
+  place,
+  index,
+  saved,
+  onClose,
+  onFullDetails,
+  onSave,
+  onRoute,
+}: {
+  place: PlaceDetail
+  index: number
+  saved: boolean
+  onClose: () => void
+  onFullDetails?: (place: Place) => void
+  onSave?: (place: Place) => void
+  onRoute?: (index: number) => void
+}) {
+  const photos = place.photos && place.photos.length > 0
+    ? place.photos
+    : place.photo_url
+      ? [place.photo_url]
+      : []
+  const btn =
+    'flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-[#F56A00]/50 hover:text-[#F56A00] dark:border-white/15 dark:text-gray-300'
+
+  return (
+    <div className="pointer-events-none absolute bottom-24 left-1/2 z-[58] w-[min(320px,calc(100%-2rem))] -translate-x-1/2">
+      <div className="pointer-events-auto rounded-2xl border border-gray-200 bg-white/95 p-3 shadow-[0_8px_30px_rgba(0,0,0,0.18)] backdrop-blur dark:border-white/10 dark:bg-[#15151a]/95">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/40 text-white transition-colors hover:bg-black/60"
+        >
+          <span aria-hidden className="text-[13px] leading-none">×</span>
+        </button>
+        {photos.length > 0 && (
+          <div className="mb-2 flex gap-2 overflow-x-auto">
+            {photos.map((photo, i) => (
+              <PlaceImage
+                key={`${photo}-${i}`}
+                place={{ ...place, photos: [photo], photo_url: undefined }}
+                className="h-20 w-28 shrink-0 rounded-lg object-cover"
+                width={224}
+                height={160}
+              />
+            ))}
+          </div>
+        )}
+        <p className="pr-6 text-[13px] font-semibold leading-snug text-gray-900 dark:text-white">{place.name}</p>
+        {place.address && (
+          <p className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">{place.address}</p>
+        )}
+        <div className="mt-1 flex items-center gap-2">
+          {place.rating != null && (
+            <span className="flex items-center gap-0.5 text-[11px] text-amber-600">
+              <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
+              {place.rating}
+            </span>
+          )}
+          {(place.price ?? place.price_level) && (
+            <span className="text-[11px] text-gray-400">{place.price ?? place.price_level}</span>
+          )}
+        </div>
+        <div className="mt-2.5 flex items-center gap-1.5">
+          {onFullDetails && (
+            <button type="button" title="Full details & photos" className={btn} onClick={() => onFullDetails(place)}>
+              <ImageIcon className="h-4 w-4" />
+            </button>
+          )}
+          {onSave && (
+            <button
+              type="button"
+              title={saved ? 'Saved' : 'Save'}
+              className={`${btn} ${saved ? 'border-[#F56A00]/60 text-[#F56A00]' : ''}`}
+              onClick={() => onSave(place)}
+            >
+              <Star className={`h-4 w-4 ${saved ? 'fill-[#F56A00]' : ''}`} />
+            </button>
+          )}
+          {onRoute && (
+            <button type="button" title="Route from my location" className={btn} onClick={() => onRoute(index)}>
+              <Navigation className="h-4 w-4" />
+            </button>
+          )}
+          {place.website && (
+            <a href={place.website} target="_blank" rel="noopener noreferrer" title="Website" className={btn}>
+              <Globe className="h-4 w-4" />
+            </a>
+          )}
+          {place.maps_url && (
+            <a href={place.maps_url} target="_blank" rel="noopener noreferrer" title="Open in Google Maps" className={btn}>
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -1321,13 +1449,16 @@ function Circles3D({ circles }: { circles: MapAnnotations['circles'] }) {
 function Fly3DToActive({
   markers,
   activeStopIndex,
+  enabled = true,
 }: {
   markers: (Place | ItineraryStop)[]
   activeStopIndex: number | null
+  /** False while the AI is still working — don't fly mid-task (dizzying). */
+  enabled?: boolean
 }) {
   const map3d = useMap3D()
   useEffect(() => {
-    if (activeStopIndex == null || !map3d?.flyCameraTo) return
+    if (!enabled || activeStopIndex == null || !map3d?.flyCameraTo) return
     const p = markers[activeStopIndex]
     if (!p || !isValidCoord(p.coordinates)) return
     map3d.flyCameraTo({
@@ -1338,7 +1469,7 @@ function Fly3DToActive({
       },
       durationMillis: 2200,
     })
-  }, [activeStopIndex, markers, map3d])
+  }, [activeStopIndex, markers, map3d, enabled])
   return null
 }
 
@@ -1357,6 +1488,7 @@ function MapCanvas({
   onRouteError,
   zoomFocusOnActive = false,
   size = 'full',
+  aiBusy = false,
   onPlaceFullDetails,
   onPlaceSave,
   onPlaceRoute,
@@ -1427,7 +1559,20 @@ function MapCanvas({
       onError={(err) => console.error('[map] Google Maps API failed to load', err)}
     >
       {realistic ? (
-        <Map3DView markers={markers} activeStopIndex={activeStopIndex} onMarkerClick={onMarkerClick} annotations={annotations} />
+        <>
+          <Map3DView markers={markers} activeStopIndex={activeStopIndex} onMarkerClick={onMarkerClick} annotations={annotations} aiBusy={aiBusy} />
+          {showBubble && activePlace && (
+            <RealisticPlaceCard
+              place={activePlace as PlaceDetail}
+              index={activeStopIndex as number}
+              saved={!!savedPlaceIds?.has((activePlace as Place).place_id)}
+              onClose={() => setBubbleOpen(false)}
+              onFullDetails={onPlaceFullDetails}
+              onSave={onPlaceSave}
+              onRoute={onPlaceRoute}
+            />
+          )}
+        </>
       ) : (
       <Map
         defaultCenter={defaultCenter}
@@ -1444,6 +1589,7 @@ function MapCanvas({
         mapTypeControl={false}
         streetViewControl={false}
         fullscreenControl={false}
+        clickableIcons={false}
         styles={MAP_STYLES}
       >
         <MapUiOptions fullControls={size === 'full'} />
@@ -1461,7 +1607,7 @@ function MapCanvas({
         <MapZoomFocus position={focusPos ?? null} enabled={useFocus} targetZoom={focusZoom} />
         <CinematicCamera
           focus={activePos}
-          enabled={is3D && markerCoords.length > 0}
+          enabled={is3D && markerCoords.length > 0 && !aiBusy}
           glideCenter={!useFocus}
           resetKey={cameraResetKey}
         />
