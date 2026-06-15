@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { asId, getSession } from '@/lib/session'
 import { clientIp, rateLimit } from '@/lib/rateLimit'
-import { consume, refund, type Identity } from '@/lib/billing'
+import { consume, refund, isUnlimited, unlimitedEntitlement, type Identity } from '@/lib/billing'
 import { adkAuthHeaders } from '@/lib/gcpAuth'
 
 // Full pipeline (Planner → Explorer → Itinerary) can exceed 2 minutes locally.
@@ -43,7 +43,11 @@ export async function POST(req: NextRequest) {
     : { kind: 'guest', key: `guest:${clientIp(req)}` }
 
   // ── Metering: spend one generation (or refuse with a gate) ────────────────
-  const spend = await consume(identity)
+  // Owner/staff allowlist bypasses metering entirely.
+  const owner = isUnlimited(session?.email)
+  const spend = owner
+    ? { ok: true as const, usedCredit: false, entitlement: unlimitedEntitlement() }
+    : await consume(identity)
   if (!spend.ok) {
     const status = spend.gate === 'login' ? 401 : 402
     return new Response(
@@ -82,8 +86,9 @@ export async function POST(req: NextRequest) {
   }).catch(() => null)
 
   if (!adkRes || !adkRes.ok || !adkRes.body) {
-    // The run never started — give the generation back (unless we failed open).
-    if (!spend.degraded) await refund(identity, spend.usedCredit)
+    // The run never started — give the generation back (unless we failed open
+    // or this is an owner who never spent one).
+    if (!owner && !spend.degraded) await refund(identity, spend.usedCredit)
     const detail = !adkRes
       ? 'no response from agent'
       : adkRes.ok

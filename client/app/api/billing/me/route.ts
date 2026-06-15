@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { clientIp } from '@/lib/rateLimit'
-import { getEntitlement, PACKS, type Identity } from '@/lib/billing'
+import { getEntitlement, isUnlimited, unlimitedEntitlement, PACKS, type Identity } from '@/lib/billing'
 import { stripeConfigured } from '@/lib/stripe'
 
 export const runtime = 'nodejs'
@@ -12,6 +12,16 @@ export async function GET(req: NextRequest) {
   const identity: Identity = session
     ? { kind: 'user', userId: session.uid }
     : { kind: 'guest', key: `guest:${clientIp(req)}` }
+
+  if (session && isUnlimited(session.email)) {
+    return NextResponse.json({
+      authed: true,
+      unlimited: true,
+      ...unlimitedEntitlement(),
+      paymentsEnabled: stripeConfigured(),
+      packs: PACKS,
+    })
+  }
 
   try {
     const ent = await getEntitlement(identity)

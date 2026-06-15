@@ -82,6 +82,26 @@ function today(): string {
   return new Date().toISOString().slice(0, 10) // YYYY-MM-DD (UTC)
 }
 
+/**
+ * Owner/staff allowlist: emails in HODARI_UNLIMITED_EMAILS (comma-separated)
+ * bypass metering entirely — no quota, no paywall. Use for the owner and any
+ * team/demo accounts that shouldn't be charged generations.
+ */
+export function isUnlimited(email?: string | null): boolean {
+  if (!email) return false
+  const list = (process.env.HODARI_UNLIMITED_EMAILS ?? '')
+    .toLowerCase()
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  return list.includes(email.toLowerCase())
+}
+
+/** An entitlement object representing "unlimited" (for allowlisted owners). */
+export function unlimitedEntitlement(): Entitlement {
+  return { kind: 'user', freeRemaining: 9999, freeLimit: 9999, credits: 0, gate: null }
+}
+
 async function mcp() {
   const sid = await mcpSession()
   await ensureConnected(sid)

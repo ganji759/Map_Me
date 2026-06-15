@@ -77,6 +77,9 @@ spec:
         # See BILLING.md → "Lock the agent endpoint".
         - name: AGENT_AUDIENCE
           value: https://hodari-agent-377773225771.us-central1.run.app
+        # Owner/staff accounts that bypass usage metering (comma-separated emails).
+        - name: HODARI_UNLIMITED_EMAILS
+          value: pacymugisho@gmail.com
         # ── Billing (Stripe) ─────────────────────────────────────────────────
         # Stripe Price ids per credit pack (NOT secret — safe as plain values).
         - name: STRIPE_PRICE_STARTER
