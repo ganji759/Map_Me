@@ -1363,9 +1363,16 @@ function MapCanvas({
   savedPlaceIds,
 }: Omit<Props, 'onExpand' | 'onCollapse' | 'selectedPlace' | 'loading' | 'error' | 'onRetry' | 'bottomSlot'>) {
   const markers = itinerary ?? places
-  const markerCoords = markers
+  const placeCoords = markers
     .map((m) => m.coordinates)
     .filter(isValidCoord)
+  // When there are no search results, center/fit on the AI's annotations instead
+  // (e.g. "show me the stadium" → a circled venue with no place list).
+  const annoCoords = [
+    ...(annotations?.markers ?? []).map((m) => m.coordinates),
+    ...(annotations?.circles ?? []).map((c) => c.center),
+  ].filter(isValidCoord)
+  const markerCoords = placeCoords.length > 0 ? placeCoords : annoCoords
   const firstPlace = markerCoords[0]
   const defaultCenter = firstPlace ?? KIGALI_DEFAULT
   const initialZoom = markerCoords.length > 0 ? 15 : DEFAULT_ZOOM
@@ -1549,7 +1556,11 @@ export function MapView({
   ...canvasProps
 }: Props) {
   const { places, itinerary } = canvasProps
-  const hasData = (itinerary?.length ?? 0) > 0 || places.length > 0
+  const hasData =
+    (itinerary?.length ?? 0) > 0 ||
+    places.length > 0 ||
+    (canvasProps.annotations?.markers?.length ?? 0) > 0 ||
+    (canvasProps.annotations?.circles?.length ?? 0) > 0
   const fallbackPlace = selectedPlace ?? places[0] ?? itinerary?.[0] ?? null
   const compactPx = 220
   const mapHeight = size === 'compact' ? 'h-full min-h-[220px]' : 'h-full'

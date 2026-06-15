@@ -16,6 +16,7 @@ import {
   Moon,
   PanelLeftClose,
   PanelRightClose,
+  Pencil,
   Send,
   Square,
   Sun,
@@ -61,6 +62,8 @@ interface Props {
   onExpandMap: () => void
   onCollapseMap: () => void
   onOpenMapFromMessage: (message: ChatMessage) => void
+  /** Edit a sent user message and re-send it (drops the turns after it). */
+  onEditMessage?: (id: string, text: string) => void
   /** Opens the in-app place details panel from the inline chat gallery. */
   onPlaceDetails?: (place: Place) => void
   onToggleMapPanel?: () => void
@@ -112,6 +115,7 @@ export function ChatPanel({
   onCollapseMap,
   mapExpanded,
   onOpenMapFromMessage,
+  onEditMessage,
   onPlaceDetails,
   onToggleMapPanel,
   selectedModel,
@@ -139,6 +143,15 @@ export function ChatPanel({
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyQuery, setHistoryQuery] = useState('')
   const [caretVisible, setCaretVisible] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
+
+  function submitEdit() {
+    const text = editText.trim()
+    const id = editingId
+    setEditingId(null)
+    if (id && text) onEditMessage?.(id, text)
+  }
   const reduced = useReducedMotion()
   /** Messages present on first render get a staggered entrance; newly appended ones animate immediately. */
   const initialCountRef = useRef(messages.length)
@@ -368,9 +381,46 @@ export function ChatPanel({
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               {msg.role === 'user' ? (
-                <div className="max-w-[min(680px,90%)] rounded-2xl rounded-br-md bg-gradient-to-br from-[#FF8C2F] to-[#F56A00] px-4 py-2.5 shadow-[0_3px_12px_rgba(245,106,0,0.28)]">
-                  <p className="text-[14px] leading-relaxed text-white">{msg.content}</p>
-                </div>
+                editingId === msg.id ? (
+                  <div className="w-full max-w-[min(680px,90%)]">
+                    <textarea
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitEdit() }
+                        if (e.key === 'Escape') setEditingId(null)
+                      }}
+                      autoFocus
+                      rows={Math.min(6, Math.max(2, editText.split('\n').length))}
+                      className="w-full resize-none rounded-2xl border border-[#F56A00]/50 bg-[var(--bg-header)] px-4 py-2.5 text-[14px] text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[#F56A00]/30"
+                    />
+                    <div className="mt-1.5 flex justify-end gap-2">
+                      <button type="button" onClick={() => setEditingId(null)} className="rounded-full px-3 py-1 text-[12px] text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]">
+                        Cancel
+                      </button>
+                      <button type="button" disabled={!editText.trim()} onClick={submitEdit} className="rounded-full bg-[#F56A00] px-3.5 py-1 text-[12px] font-medium text-white transition-colors hover:bg-[#e05a1a] disabled:opacity-40">
+                        Send
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="group flex items-end gap-1.5">
+                    {onEditMessage && !loading && (
+                      <button
+                        type="button"
+                        onClick={() => { setEditingId(msg.id); setEditText(msg.content) }}
+                        title="Edit & resend"
+                        aria-label="Edit and resend message"
+                        className="mb-1 shrink-0 rounded-full p-1 text-[var(--text-secondary)] opacity-0 transition-opacity hover:text-[#F56A00] group-hover:opacity-100"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    <div className="max-w-[min(680px,90%)] rounded-2xl rounded-br-md bg-gradient-to-br from-[#FF8C2F] to-[#F56A00] px-4 py-2.5 shadow-[0_3px_12px_rgba(245,106,0,0.28)]">
+                      <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-white">{msg.content}</p>
+                    </div>
+                  </div>
+                )
               ) : (
                 <div className="w-full max-w-[min(680px,100%)] text-left">
                   <p className="mb-1.5 ml-1 text-[11px] font-medium uppercase tracking-wider text-[#F56A00] dark:text-[#FF8C2F]">

@@ -970,6 +970,17 @@ export default function LandingPage() {
   const routeActive = routeFromUser || !!customRoute
   const hasMapData = mapPlaces.length > 0
 
+  // Edit a sent message + re-send it: drop that turn and everything after, then
+  // resend the edited text so the AI answers it fresh.
+  const handleEditMessage = useCallback((id: string, newText: string) => {
+    if (loading) return
+    setMessages((prev) => {
+      const idx = prev.findIndex((m) => m.id === id)
+      return idx < 0 ? prev : prev.slice(0, idx)
+    })
+    handleSend(newText)
+  }, [loading, handleSend])
+
   const chatPanel = (
     <ChatPanel
       messages={messages}
@@ -994,6 +1005,7 @@ export default function LandingPage() {
       onExpandMap={() => { setMapVisible(true); setMapExpanded(true); setChatCollapsed(false) }}
       onCollapseMap={() => { setMapExpanded(false); setMapVisible(true); setChatCollapsed(false) }}
       onOpenMapFromMessage={handleOpenMapFromMessage}
+      onEditMessage={handleEditMessage}
       onPlaceDetails={handleGalleryCardClick}
       onToggleMapPanel={() => {
         setMapVisible((v) => {
