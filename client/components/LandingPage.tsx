@@ -209,6 +209,9 @@ export default function LandingPage() {
   // Calendar events already surfaced as chips (keyed place_id:date) — avoids
   // re-showing the same scheduled visit on later turns.
   const shownCalendarKeysRef = useRef(new Set<string>())
+  // Signed-in members get server-side (encrypted, cross-device) chat history;
+  // guests fall back to localStorage. Set during the initial history load.
+  const authedRef = useRef(false)
   const placePhotoKey = places
     .map((p) => `${p.place_id}:${p.photo_url || p.photos?.length ? 1 : 0}`)
     .join(',')
@@ -712,6 +715,10 @@ export default function LandingPage() {
       localStorage.removeItem('hodari_email')
       localStorage.removeItem('hodari_name')
       localStorage.removeItem('hodari_active_session')
+      // Clear personal data so a shared/public browser doesn't leak the previous
+      // user's chats or saved places to the next person.
+      localStorage.removeItem('hodari_history')
+      localStorage.removeItem('hodari_saved')
     } catch { /* ignore */ }
     window.location.href = '/login'
   }, [])
@@ -767,6 +774,9 @@ export default function LandingPage() {
 
   const handleDeleteHistory = useCallback((id: string) => {
     setHistoryItems((prev) => prev.filter((item) => item.id !== id))
+    if (authedRef.current) {
+      fetch(`/api/chats?sessionId=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {})
+    }
   }, [])
 
   const handleOpenMapFromMessage = useCallback((message: ChatMessage) => {
@@ -787,10 +797,7 @@ export default function LandingPage() {
     setSpeechOutSupported(isSpeechOutputSupported())
     const savedVoice = localStorage.getItem('hodari_speak')
     if (savedVoice === '0') setSpeakReplies(false)
-    try {
-      const savedHistory = localStorage.getItem('hodari_history')
-      const parsed = savedHistory ? JSON.parse(savedHistory) as HistoryItem[] : []
-      const items = Array.isArray(parsed) ? parsed.slice(0, 20) : []
+    const resume = (items: HistoryItem[]) => {
       setHistoryItems(items)
       // Resume the conversation we left (e.g. after visiting Saved places) instead
       // of starting a blank one — unless we were already in a fresh, unsent chat.
@@ -802,17 +809,56 @@ export default function LandingPage() {
       } else {
         localStorage.setItem('hodari_active_session', sessionId.current)
       }
-    } catch {
-      setHistoryItems([])
-    } finally {
-      setHistoryLoaded(true)
     }
+
+    const loadLocal = () => {
+      try {
+        const savedHistory = localStorage.getItem('hodari_history')
+        const parsed = savedHistory ? JSON.parse(savedHistory) as HistoryItem[] : []
+        resume(Array.isArray(parsed) ? parsed.slice(0, 20) : [])
+      } catch {
+        setHistoryItems([])
+      }
+    }
+
+    // Members → server history (encrypted, cross-device). Guests → localStorage.
+    fetch('/api/chats')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.authed) {
+          authedRef.current = true
+          resume((d.chats ?? []).map((c: HistoryItem) => ({ id: c.id, title: c.title, updatedAt: c.updatedAt, messages: c.messages ?? [] })))
+        } else {
+          loadLocal()
+        }
+      })
+      .catch(() => loadLocal())
+      .finally(() => setHistoryLoaded(true))
   }, [])
 
+  // Persist the history list. Members sync to the server (encrypted, debounced
+  // below); guests keep it in localStorage. We never write transcripts to
+  // localStorage for members, so logout / a shared browser can't leak them.
   useEffect(() => {
-    if (!historyLoaded) return
+    if (!historyLoaded || authedRef.current) return
     localStorage.setItem('hodari_history', JSON.stringify(historyItems.slice(0, 20)))
   }, [historyItems, historyLoaded])
+
+  // Members: debounced save of the active conversation to the server. Debounced
+  // so streaming token updates coalesce into one write per turn.
+  useEffect(() => {
+    if (!historyLoaded || !authedRef.current || !messages.length) return
+    const t = setTimeout(() => {
+      const firstUser = messages.find((m) => m.role === 'user') ?? messages[0]
+      const title = firstUser.content.replace(/\s+/g, ' ').trim().slice(0, 56) || 'Untitled chat'
+      fetch('/api/chats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: sessionId.current, title, messages }),
+      }).catch(() => {})
+    }, 1500)
+    return () => clearTimeout(t)
+  }, [messages, historyLoaded])
 
   useEffect(() => {
     if (!messages.length) return

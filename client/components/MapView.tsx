@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { APIProvider, Map, AdvancedMarker, InfoWindow, Pin, useMap } from '@vis.gl/react-google-maps'
+import { APIProvider, Map, Map3D, Marker3D, MapMode, AltitudeMode, AdvancedMarker, InfoWindow, Pin, useMap, useMap3D } from '@vis.gl/react-google-maps'
 import { AlertCircle, ChevronLeft, Compass, ExternalLink, Globe, Image as ImageIcon, Loader2, MapPin, Maximize2, Minimize2, Navigation, RotateCcw, RotateCw, Star } from 'lucide-react'
 import type { ItineraryStop, Place, Theme } from '@/lib/types'
 import type { CustomRouteConfig, MapAnnotations, TravelMode } from '@/lib/mapActions'
@@ -338,12 +338,15 @@ function MapZoomFocus({
   return null
 }
 
-type MapDisplayMode = '3d' | 'map' | 'satellite'
+type MapDisplayMode = '3d' | 'map' | 'satellite' | 'realistic'
 
 const MAP_MODE_OPTIONS: { id: MapDisplayMode; label: string }[] = [
   { id: '3d', label: '3D' },
   { id: 'map', label: 'Map' },
   { id: 'satellite', label: 'Satellite' },
+  // Photorealistic Google 3D (Map3DElement). Coverage is US-centric today —
+  // which fits the 11 US World Cup host cities; elsewhere it shows a plain globe.
+  { id: 'realistic', label: 'Realistic' },
 ]
 
 function MapUiOptions({ fullControls }: { fullControls: boolean }) {
@@ -1188,6 +1191,77 @@ function MapCircles({ circles }: { circles: MapAnnotations['circles'] }) {
   return null
 }
 
+/**
+ * Photorealistic "Realistic" 3D view via Google Map3DElement (full map only).
+ * Renders the same place markers and flies the camera to the selected one.
+ * Coverage is strongest in US cities (11 of the 16 World Cup hosts); elsewhere
+ * it falls back to a plain 3D globe.
+ */
+function Map3DView({
+  markers,
+  activeStopIndex,
+  onMarkerClick,
+}: {
+  markers: (Place | ItineraryStop)[]
+  activeStopIndex: number | null
+  onMarkerClick: (index: number) => void
+}) {
+  const first = markers.find((m) => isValidCoord(m.coordinates))?.coordinates
+  const center: google.maps.LatLngAltitudeLiteral = first
+    ? { lat: first.lat, lng: first.lng, altitude: 0 }
+    : { lat: 40.8135, lng: -74.0745, altitude: 0 } // MetLife Stadium — US default
+
+  return (
+    <Map3D
+      className="h-full w-full"
+      defaultCenter={center}
+      defaultRange={2200}
+      defaultTilt={62}
+      mode={MapMode.HYBRID}
+    >
+      {markers.map((p, i) =>
+        isValidCoord(p.coordinates) ? (
+          <Marker3D
+            key={`m3d-${p.place_id || p.name}-${i}`}
+            position={{ lat: p.coordinates.lat, lng: p.coordinates.lng, altitude: 45 }}
+            altitudeMode={AltitudeMode.RELATIVE_TO_GROUND}
+            extruded
+            label={String(i + 1)}
+            onClick={() => onMarkerClick(i)}
+          />
+        ) : null,
+      )}
+      <Fly3DToActive markers={markers} activeStopIndex={activeStopIndex} />
+    </Map3D>
+  )
+}
+
+/** Smooth camera fly to the selected marker on the 3D map. */
+function Fly3DToActive({
+  markers,
+  activeStopIndex,
+}: {
+  markers: (Place | ItineraryStop)[]
+  activeStopIndex: number | null
+}) {
+  const map3dApi = useMap3D()
+  useEffect(() => {
+    const fly = map3dApi?.flyCameraTo
+    if (activeStopIndex == null || !fly) return
+    const p = markers[activeStopIndex]
+    if (!p || !isValidCoord(p.coordinates)) return
+    fly({
+      endCamera: {
+        center: { lat: p.coordinates.lat, lng: p.coordinates.lng, altitude: 0 },
+        range: 700,
+        tilt: 62,
+      },
+      durationMillis: 2200,
+    })
+  }, [activeStopIndex, markers, map3dApi])
+  return null
+}
+
 function MapCanvas({
   places,
   itinerary,
@@ -1237,6 +1311,7 @@ function MapCanvas({
   // 3D vector perspective by default in full mode; compact stays flat.
   const [mapMode, setMapMode] = useState<MapDisplayMode>('3d')
   const is3D = !isCompact && mapMode === '3d'
+  const realistic = !isCompact && mapMode === 'realistic'
 
   // Marker action bubble (full map): a small popup on the selected marker with
   // quick actions, instead of slamming the full details panel open every click.
@@ -1261,8 +1336,12 @@ function MapCanvas({
     <APIProvider
       apiKey={API_KEY}
       libraries={['geometry', 'places']}
+      version="beta"
       onError={(err) => console.error('[map] Google Maps API failed to load', err)}
     >
+      {realistic ? (
+        <Map3DView markers={markers} activeStopIndex={activeStopIndex} onMarkerClick={onMarkerClick} />
+      ) : (
       <Map
         defaultCenter={defaultCenter}
         defaultZoom={markerCoords.length > 0 ? (isCompact ? 17 : initialZoom) : DEFAULT_ZOOM}
@@ -1367,8 +1446,9 @@ function MapCanvas({
           />
         )}
       </Map>
+      )}
       {size === 'full' && <MapModeControl mode={mapMode} onChange={setMapMode} />}
-      {size === 'full' && mapMode !== 'satellite' && <MapRotateControls />}
+      {size === 'full' && !realistic && mapMode !== 'satellite' && <MapRotateControls />}
     </APIProvider>
   )
 }

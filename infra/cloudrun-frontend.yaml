@@ -33,10 +33,12 @@ spec:
           value: mapsme-498314
         - name: GEMINI_VOICE_LOCATION
           value: us-central1
+        # Dedicated, API-restricted server key (Routes + Places + photos) — split
+        # from the agent's Grounding-Lite key for least-privilege blast radius.
         - name: GOOGLE_MAPS_SERVER_KEY
           valueFrom:
             secretKeyRef:
-              name: GOOGLE_MAPS_API_KEY
+              name: GOOGLE_MAPS_SERVER_KEY
               key: latest
         - name: MONGODB_MCP_URL
           value: http://localhost:3100/mcp
