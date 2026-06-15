@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { APIProvider, Map, Map3D, Marker3D, MapMode, AltitudeMode, AdvancedMarker, InfoWindow, Pin, useMap, useMap3D } from '@vis.gl/react-google-maps'
+import { APIProvider, Map, Map3D, Marker3D, MapMode, AltitudeMode, AdvancedMarker, InfoWindow, Pin, useMap, useMap3D, useMapsLibrary } from '@vis.gl/react-google-maps'
 import { AlertCircle, ChevronLeft, Compass, ExternalLink, Globe, Image as ImageIcon, Loader2, MapPin, Maximize2, Minimize2, Navigation, RotateCcw, RotateCw, Star } from 'lucide-react'
 import type { ItineraryStop, Place, Theme } from '@/lib/types'
 import type { CustomRouteConfig, MapAnnotations, TravelMode } from '@/lib/mapActions'
@@ -1197,14 +1197,43 @@ function MapCircles({ circles }: { circles: MapAnnotations['circles'] }) {
  * Coverage is strongest in US cities (11 of the 16 World Cup hosts); elsewhere
  * it falls back to a plain 3D globe.
  */
+const NAMED_COLORS: Record<string, string> = {
+  red: '#E5484D', green: '#1FA463', blue: '#3B82F6', yellow: '#F5C518',
+  orange: '#F56A00', purple: '#8B5CF6', pink: '#EC4899', white: '#FFFFFF',
+}
+function toHexColor(c?: string): string {
+  if (!c) return ROUTE_ORANGE
+  if (c.startsWith('#')) return c
+  return NAMED_COLORS[c.toLowerCase()] ?? ROUTE_ORANGE
+}
+/** Translucent fill (hex8) for a circle on the 3D map. */
+function fillColorFor(c?: string): string {
+  const h = toHexColor(c)
+  return h.length >= 7 ? `${h.slice(0, 7)}33` : h // ~20% alpha
+}
+/** A ring of ~72 lat/lng points approximating a circle (maps3d has no Circle). */
+function circleRing(center: LatLng, radiusM: number, n = 72): google.maps.LatLngLiteral[] {
+  const pts: google.maps.LatLngLiteral[] = []
+  const lat0 = (center.lat * Math.PI) / 180
+  for (let i = 0; i <= n; i++) {
+    const ang = (i / n) * 2 * Math.PI
+    const dLat = (radiusM * Math.cos(ang)) / 111320
+    const dLng = (radiusM * Math.sin(ang)) / (111320 * Math.cos(lat0))
+    pts.push({ lat: center.lat + dLat, lng: center.lng + dLng })
+  }
+  return pts
+}
+
 function Map3DView({
   markers,
   activeStopIndex,
   onMarkerClick,
+  annotations,
 }: {
   markers: (Place | ItineraryStop)[]
   activeStopIndex: number | null
   onMarkerClick: (index: number) => void
+  annotations?: MapAnnotations
 }) {
   const first = markers.find((m) => isValidCoord(m.coordinates))?.coordinates
   const center: google.maps.LatLngAltitudeLiteral = first
@@ -1231,9 +1260,61 @@ function Map3DView({
           />
         ) : null,
       )}
+      {/* AI-placed highlight markers (★) that aren't in the result list. */}
+      {(annotations?.markers ?? []).filter((m) => isValidCoord(m.coordinates)).map((m) => (
+        <Marker3D
+          key={`anno3d-${m.id}`}
+          position={{ lat: m.coordinates.lat, lng: m.coordinates.lng, altitude: 50 }}
+          altitudeMode={AltitudeMode.RELATIVE_TO_GROUND}
+          extruded
+          label="★"
+        />
+      ))}
+      {/* AI-drawn circles — rendered as ground polygons so they show in 3D too. */}
+      <Circles3D circles={annotations?.circles ?? []} />
       <Fly3DToActive markers={markers} activeStopIndex={activeStopIndex} />
     </Map3D>
   )
+}
+
+/**
+ * Draws annotation circles on the photorealistic map. maps3d has no Circle
+ * primitive and vis.gl ships no Polygon3D component, so we create
+ * Polygon3DElement rings imperatively and append them to the Map3DElement.
+ */
+function Circles3D({ circles }: { circles: MapAnnotations['circles'] }) {
+  const maps3d = useMapsLibrary('maps3d')
+  const map3d = useMap3D()
+  const polysRef = useRef<HTMLElement[]>([])
+
+  useEffect(() => {
+    if (!maps3d || !map3d) return
+    const lib = maps3d as unknown as {
+      Polygon3DElement: new (o: google.maps.maps3d.Polygon3DElementOptions) => HTMLElement
+      AltitudeMode: typeof google.maps.maps3d.AltitudeMode
+    }
+    polysRef.current.forEach((p) => { try { p.remove() } catch { /* gone */ } })
+    polysRef.current = []
+    for (const c of circles) {
+      if (!isValidCoord(c.center) || !(c.radiusM > 0)) continue
+      const poly = new lib.Polygon3DElement({
+        outerCoordinates: circleRing(c.center, c.radiusM),
+        fillColor: fillColorFor(c.color),
+        strokeColor: toHexColor(c.color),
+        strokeWidth: 6,
+        altitudeMode: lib.AltitudeMode.CLAMP_TO_GROUND,
+        drawsOccludedSegments: true,
+      })
+      map3d.append(poly)
+      polysRef.current.push(poly)
+    }
+    return () => {
+      polysRef.current.forEach((p) => { try { p.remove() } catch { /* gone */ } })
+      polysRef.current = []
+    }
+  }, [maps3d, map3d, circles])
+
+  return null
 }
 
 /** Smooth camera fly to the selected marker on the 3D map. */
@@ -1244,13 +1325,12 @@ function Fly3DToActive({
   markers: (Place | ItineraryStop)[]
   activeStopIndex: number | null
 }) {
-  const map3dApi = useMap3D()
+  const map3d = useMap3D()
   useEffect(() => {
-    const fly = map3dApi?.flyCameraTo
-    if (activeStopIndex == null || !fly) return
+    if (activeStopIndex == null || !map3d?.flyCameraTo) return
     const p = markers[activeStopIndex]
     if (!p || !isValidCoord(p.coordinates)) return
-    fly({
+    map3d.flyCameraTo({
       endCamera: {
         center: { lat: p.coordinates.lat, lng: p.coordinates.lng, altitude: 0 },
         range: 700,
@@ -1258,7 +1338,7 @@ function Fly3DToActive({
       },
       durationMillis: 2200,
     })
-  }, [activeStopIndex, markers, map3dApi])
+  }, [activeStopIndex, markers, map3d])
   return null
 }
 
@@ -1340,7 +1420,7 @@ function MapCanvas({
       onError={(err) => console.error('[map] Google Maps API failed to load', err)}
     >
       {realistic ? (
-        <Map3DView markers={markers} activeStopIndex={activeStopIndex} onMarkerClick={onMarkerClick} />
+        <Map3DView markers={markers} activeStopIndex={activeStopIndex} onMarkerClick={onMarkerClick} annotations={annotations} />
       ) : (
       <Map
         defaultCenter={defaultCenter}
