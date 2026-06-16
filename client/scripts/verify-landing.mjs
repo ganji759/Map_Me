@@ -1,0 +1,18 @@
+import { createRequire } from 'node:module'
+const require = createRequire(import.meta.url)
+const { chromium } = require('C:/Users/User/AppData/Local/npm-cache/_npx/9833c18b2d85bc59/node_modules/playwright')
+const browser = await chromium.launch({ headless: false, executablePath: 'C:/Users/User/AppData/Local/ms-playwright/chromium-1223/chrome-win64/chrome.exe' })
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: 'no-preference' })
+const page = await ctx.newPage()
+await page.goto('http://localhost:3000/', { waitUntil: 'load', timeout: 60000 })
+await page.bringToFront()
+await new Promise(r=>setTimeout(r,1500))
+await page.screenshot({ path: 'C:/Users/User/Documents/Map_Me/client/.rec/hero.png' })
+// scroll to the demo section
+await page.evaluate(() => document.getElementById('demo')?.scrollIntoView({ behavior:'instant', block:'center' }))
+await page.waitForSelector('#demo video', { timeout: 10000 }).catch(()=>console.log('! no demo video'))
+await new Promise(r=>setTimeout(r,6000))
+const r = await page.evaluate(() => { const v=document.querySelector('#demo video'); return v?{t:+v.currentTime.toFixed(2),paused:v.paused,src:v.currentSrc.split('/').pop()}:'none' })
+console.log('demo video:', JSON.stringify(r))
+await page.screenshot({ path: 'C:/Users/User/Documents/Map_Me/client/.rec/demo.png' })
+await browser.close()

@@ -2,19 +2,19 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, Menu, X } from 'lucide-react'
+import { ArrowRight, MapPin, Menu, X } from 'lucide-react'
 import {
   EASE,
   HodariLogo,
   LiveClock,
   Reveal,
   RollText,
-  StarburstMark,
   ThemeToggle,
   useLandingTheme,
 } from '@/components/landing/bits'
 
 import HeroMap from '@/components/landing/HeroMap'
+import HeroAgentDemo from '@/components/landing/HeroAgentDemo'
 import ShowcaseMarquee from '@/components/landing/ShowcaseMarquee'
 
 const NAV_LINKS = [
@@ -165,7 +165,7 @@ export default function HodariLanding() {
             <OrangeCta href={ctaHref} label="Start exploring" />
 
             <span className="flex w-fit items-center gap-2.5 rounded-[4px] bg-white px-3 py-2 shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-shadow duration-300 hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] dark:bg-[#15151a] dark:shadow-[0_2px_8px_rgba(0,0,0,0.45)]">
-              <StarburstMark />
+              <MapPin size={15} strokeWidth={2.5} className="text-[#F56A00]" />
               <span className="text-[13px] font-medium text-gray-900 dark:text-gray-100 sm:text-[14px]">
                 Grounded by Google Maps
               </span>
@@ -311,12 +311,40 @@ export default function HodariLanding() {
         </div>
       </section>
 
+      {/* ── SECTION 4 · SEE IT IN ACTION ─────────────────────────────────── */}
+      <section id="demo" className="overflow-hidden bg-white pb-16 pt-16 dark:bg-[#0e0e12] sm:pb-20 sm:pt-20 lg:pb-28 lg:pt-28">
+        <div className="mx-auto max-w-[1440px]">
+          <SectionBadge number="3" label="See it in action" />
+
+          <div className="grid items-center gap-10 px-5 sm:px-8 lg:grid-cols-2 lg:gap-16 lg:px-12">
+            <Reveal>
+              <div className="flex flex-col items-start">
+                <h2 className="mb-5 font-display font-semibold leading-[1.1] tracking-[-0.01em] text-gray-900 dark:text-gray-50 text-[clamp(1.6rem,4.5vw,3.2rem)]">
+                  Watch Hodari work the&nbsp;map
+                </h2>
+                <p className="mb-8 max-w-[46ch] text-[15px] leading-relaxed text-gray-600 dark:text-gray-300 sm:text-[17px]">
+                  Ask in plain words. Hodari reads where you are, searches real
+                  places on Google&apos;s photorealistic 3D map, drops the best
+                  picks with walk-times and a route you can actually follow.
+                  Live, grounded, never invented.
+                </p>
+                <OrangeCta href={ctaHref} label="Try it yourself" />
+              </div>
+            </Reveal>
+
+            <Reveal delay={120}>
+              <HeroAgentDemo className="mx-auto w-full max-w-[340px]" />
+            </Reveal>
+          </div>
+        </div>
+      </section>
+
       {/* ── FOOTER ───────────────────────────────────────────────────────── */}
       <footer className="border-t border-gray-200 bg-[#F5F5F5] dark:border-white/10 dark:bg-[#0b0b0f]">
         <div className="mx-auto flex max-w-[1440px] flex-col items-start justify-between gap-3 px-5 py-8 text-[13px] text-gray-600 dark:text-gray-400 sm:flex-row sm:items-center sm:px-8 lg:px-12">
           <span className="flex items-center gap-2.5">
             <HodariLogo className="h-7 w-7" />
-            © 2026 Hodari. Built for the FIFA World Cup.
+            © 2026 Hodari. Built for a live travel experience.
           </span>
           <span className="flex items-center gap-5">
             <Link href="/login" className="transition-colors duration-300 hover:text-gray-900 dark:hover:text-gray-100">
