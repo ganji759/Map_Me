@@ -47,5 +47,7 @@ ENV AGENT_SERVICE=orchestrator
 
 # Use sh -c so ${AGENT_SERVICE} and ${PORT} expand at container start time.
 # Passing services/${AGENT_SERVICE} tells ADK to load that specific package's
-# root_agent (e.g. services/planner/__init__.py).
-CMD ["sh", "-c", "adk api_server ${AGENT_SERVICE} --port ${PORT} --host 0.0.0.0"]
+# root_agent (e.g. services/planner/__init__.py). ADK sees a single-agent dir,
+# so the exposed ADK app name is the leaf folder (planner | explorer | itinerary
+# | orchestrator) — which is exactly what the orchestrator's HTTP client targets.
+CMD ["sh", "-c", "adk api_server services/${AGENT_SERVICE} --port ${PORT} --host 0.0.0.0"]

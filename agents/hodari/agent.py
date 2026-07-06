@@ -8,7 +8,7 @@ from google.adk.agents.context_cache_config import ContextCacheConfig
 from google.adk.apps.app import App
 from .sub_agents.planner import planner_agent
 from .sub_agents.explorer import explorer_agent
-from .sub_agents.itinerary import itinerary_agent
+from .sub_agents.itinerary import itinerary_loop
 from .tools.map_control import map_control
 from .tools.maps_mcp import create_maps_toolset
 from .tools.fixtures import world_cup_venues
@@ -41,7 +41,7 @@ _pipeline = SequentialAgent(
         "('plan my afternoon', 'food tour with routes'). Call ONLY when the user wants "
         "concrete recommendations right now. Do NOT call for greetings or casual chat."
     ),
-    sub_agents=[planner_agent, explorer_agent, itinerary_agent],
+    sub_agents=[planner_agent, explorer_agent, itinerary_loop],
 )
 
 ORCHESTRATOR_INSTRUCTION = """You are Hodari, a warm, knowledgeable companion for visitors during the

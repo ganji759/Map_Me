@@ -4,6 +4,7 @@
  */
 import { mcpSession, mcpCall, ensureConnected, extractDocs } from '@/lib/mcp'
 import { encryptSecret, decryptSecret } from '@/lib/crypto'
+import { hashPassword, verifyPassword } from '@/lib/password'
 
 const DB = process.env.MONGODB_DATABASE ?? 'hodari'
 
@@ -66,6 +67,70 @@ export async function findOrCreateUser(email: string, name: string): Promise<Hod
     created_at: new Date().toISOString(),
   }
   await mcpCall(sid, 'insert-many', { database: DB, collection: 'users', documents: [doc] })
+  return publicUser(doc)
+}
+
+/** Distinguishes the outcome of a password sign-up attempt for the API layer. */
+export type SignupResult =
+  | { ok: true; user: HodariUser }
+  | { ok: false; reason: 'email_taken' }
+
+/**
+ * Register a new email/password user. Fails if the email is already registered
+ * (whether via Google or a prior password sign-up) so we never silently attach a
+ * password to someone else's account. Stores only a scrypt hash — never the
+ * plaintext. Mirrors the `findOrCreateUser` doc shape + `created_at` marker so a
+ * "new user" query works the same regardless of sign-in method.
+ */
+export async function createUserWithPassword(
+  email: string,
+  name: string,
+  plainPassword: string,
+): Promise<SignupResult> {
+  const cleanEmail = email.trim().toLowerCase()
+  const cleanName = name.trim() || cleanEmail.split('@')[0]
+
+  const sid = await mcpSession()
+  await ensureConnected(sid)
+
+  const existing = extractDocs(
+    await mcpCall(sid, 'find', { database: DB, collection: 'users', filter: { email: cleanEmail }, limit: 1 }),
+  )
+  if (existing.length > 0) return { ok: false, reason: 'email_taken' }
+
+  let userId = slugifyId(cleanName, cleanEmail)
+  const clash = extractDocs(
+    await mcpCall(sid, 'find', { database: DB, collection: 'users', filter: { user_id: userId }, limit: 1 }),
+  )
+  if (clash.length > 0) userId = `${userId}_${Math.random().toString(36).slice(2, 6)}`
+
+  const doc = {
+    user_id: userId, name: cleanName, email: cleanEmail,
+    password_hash: hashPassword(plainPassword),
+    home_country: null, languages: ['en'], dietary: [], budget_tier: 'moderate', accessibility: [],
+    created_at: new Date().toISOString(),
+  }
+  await mcpCall(sid, 'insert-many', { database: DB, collection: 'users', documents: [doc] })
+  return { ok: true, user: publicUser(doc) }
+}
+
+/**
+ * Verify an email/password login. Returns the user on success, or null on a bad
+ * email/password OR an account with no password set (e.g. a Google-only user) —
+ * the caller shows one generic "wrong email or password" either way so we never
+ * reveal which emails exist or how they signed up.
+ */
+export async function verifyUserPassword(email: string, plainPassword: string): Promise<HodariUser | null> {
+  const cleanEmail = email.trim().toLowerCase()
+  const sid = await mcpSession()
+  await ensureConnected(sid)
+
+  const docs = extractDocs(
+    await mcpCall(sid, 'find', { database: DB, collection: 'users', filter: { email: cleanEmail }, limit: 1 }),
+  )
+  const doc = docs[0]
+  if (!doc) return null
+  if (!verifyPassword(plainPassword, doc.password_hash as string | undefined)) return null
   return publicUser(doc)
 }
 

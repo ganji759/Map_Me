@@ -98,7 +98,13 @@ enabled yet.
 
 ---
 
-## Lock the agent endpoint (P0.3 — do this, or the paywall is bypassable)
+## Lock the agent endpoint (P0.3 — ✅ SHIPPED 2026-07-03)
+
+> **Status: done.** `hodari-agent` no longer accepts `allUsers`; invoker is
+> restricted to `hodari-agent@mapsme-498314.iam.gserviceaccount.com` (the
+> frontend's SA). Verified 2026-07-03: anonymous `GET /` and `POST /run_sse`
+> both return **403**, while a guest chat through `/api/chat` still streams.
+> The steps below are kept for reference / rollback.
 
 Metering at the frontend is worthless while `hodari-agent` accepts `allUsers`:
 anyone can `curl` the agent URL directly and skip the paywall. The frontend now

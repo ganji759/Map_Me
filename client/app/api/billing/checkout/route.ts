@@ -27,6 +27,11 @@ export async function POST(req: NextRequest) {
   const pack = typeof body.packId === 'string' ? packById(body.packId) : undefined
   if (!pack) return NextResponse.json({ error: 'Unknown pack' }, { status: 400 })
 
+  // Where Stripe returns the buyer. Whitelisted to internal paths so the param
+  // can't be turned into an open redirect; defaults to the chat surface.
+  const RETURNABLE = ['/chat', '/billing'] as const
+  const returnTo = RETURNABLE.includes(body.returnTo) ? (body.returnTo as string) : '/chat'
+
   const price = priceIdFor(pack.id)
   if (!price) return NextResponse.json({ error: `Pack ${pack.id} has no price configured.` }, { status: 503 })
 
@@ -34,8 +39,8 @@ export async function POST(req: NextRequest) {
     const checkout = await stripe().checkout.sessions.create({
       mode: 'payment',
       line_items: [{ price, quantity: 1 }],
-      success_url: appUrl(req, '/chat?purchase=success'),
-      cancel_url: appUrl(req, '/chat?purchase=cancel'),
+      success_url: appUrl(req, `${returnTo}?purchase=success`),
+      cancel_url: appUrl(req, `${returnTo}?purchase=cancel`),
       client_reference_id: session.uid,
       customer_email: session.email,
       // The webhook reads these back to know who/how-much to credit.

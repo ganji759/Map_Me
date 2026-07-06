@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Loader2, MapPin, Star, Utensils } from 'lucide-react'
 import {
@@ -46,6 +46,13 @@ export default function LoginView() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Email/password form state.
+  const [mode, setMode] = useState<'login' | 'signup'>('login')
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [formBusy, setFormBusy] = useState(false)
+
   // Surface OAuth errors passed back as ?error=… on the redirect.
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get('error')
@@ -55,6 +62,36 @@ export default function LoginView() {
   const signInWithGoogle = () => {
     setBusy(true)
     window.location.href = '/api/auth/google'
+  }
+
+  const toggleMode = () => {
+    setMode((m) => (m === 'login' ? 'signup' : 'login'))
+    setError(null)
+  }
+
+  async function submitEmail(e: FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setFormBusy(true)
+    try {
+      const endpoint = mode === 'signup' ? '/api/auth/signup' : '/api/auth/login'
+      const payload = mode === 'signup' ? { name, email, password } : { email, password }
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data.error ?? 'Something went wrong. Please try again.')
+        setFormBusy(false)
+        return
+      }
+      window.location.href = '/chat'
+    } catch {
+      setError('Network error. Please try again.')
+      setFormBusy(false)
+    }
   }
 
   return (
@@ -121,16 +158,67 @@ export default function LoginView() {
         {/* Sign-in card */}
         <div className="order-1 w-full max-w-[460px] animate-[fadeUp_0.8s_0.12s_both] motion-reduce:animate-none justify-self-center rounded-3xl bg-white p-7 shadow-[0_24px_80px_rgba(0,0,0,0.16),0_2px_12px_rgba(0,0,0,0.06)] ring-1 ring-black/5 dark:bg-[#131318] dark:shadow-[0_24px_80px_rgba(0,0,0,0.65),0_2px_12px_rgba(0,0,0,0.5)] dark:ring-white/10 sm:p-9 lg:order-2 lg:justify-self-end">
           <h2 className="font-display text-[24px] font-semibold leading-[1.12] tracking-[-0.01em] text-gray-900 dark:text-gray-50 sm:text-[26px]">
-            Sign in to Hodari.
+            {mode === 'signup' ? 'Create your account.' : 'Sign in to Hodari.'}
           </h2>
           <p className="mt-2 text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
-            Continue with Google. Your fan profile and saved places follow your account.
+            {mode === 'signup'
+              ? 'Sign up with your email, or continue with Google. Your fan profile follows your account.'
+              : 'Continue with your email or Google. Your fan profile and saved places follow your account.'}
           </p>
 
           <div className="mt-7 space-y-4">
             {error && (
               <p className="text-[13px] text-[#e05a1a]" role="alert">{error}</p>
             )}
+
+            <form onSubmit={submitEmail} className="space-y-3">
+              {mode === 'signup' && (
+                <input
+                  type="text"
+                  autoComplete="name"
+                  required
+                  placeholder="Your name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-[14px] text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-[#F56A00] dark:border-white/15 dark:bg-white/5 dark:text-gray-100 dark:placeholder:text-gray-500"
+                />
+              )}
+              <input
+                type="email"
+                autoComplete="email"
+                required
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-[14px] text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-[#F56A00] dark:border-white/15 dark:bg-white/5 dark:text-gray-100 dark:placeholder:text-gray-500"
+              />
+              <input
+                type="password"
+                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                required
+                minLength={mode === 'signup' ? 8 : undefined}
+                placeholder={mode === 'signup' ? 'Password (min. 8 characters)' : 'Password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-[14px] text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-[#F56A00] dark:border-white/15 dark:bg-white/5 dark:text-gray-100 dark:placeholder:text-gray-500"
+              />
+              <button
+                type="submit"
+                disabled={formBusy}
+                className="flex w-full items-center justify-center gap-2 rounded-full bg-[#F56A00] py-3.5 text-[14px] font-semibold text-white transition-colors hover:bg-[#e05a1a] disabled:cursor-wait disabled:opacity-70"
+              >
+                {formBusy && <Loader2 size={16} className="animate-spin motion-reduce:animate-none" />}
+                {formBusy
+                  ? mode === 'signup' ? 'Creating account…' : 'Signing in…'
+                  : mode === 'signup' ? 'Create account' : 'Sign in'}
+              </button>
+            </form>
+
+            <div className="flex items-center gap-3 py-1">
+              <span className="h-px flex-1 bg-gray-200 dark:bg-white/10" />
+              <span className="text-[11px] uppercase tracking-wide text-gray-400 dark:text-gray-500">or</span>
+              <span className="h-px flex-1 bg-gray-200 dark:bg-white/10" />
+            </div>
 
             <button
               type="button"
@@ -146,8 +234,15 @@ export default function LoginView() {
               {busy ? 'Redirecting to Google…' : 'Continue with Google'}
             </button>
 
-            <p className="text-center text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-              We only use your name and email to build your profile.
+            <p className="text-center text-[13px] text-gray-500 dark:text-gray-400">
+              {mode === 'signup' ? 'Already have an account?' : 'New to Hodari?'}{' '}
+              <button
+                type="button"
+                onClick={toggleMode}
+                className="font-semibold text-[#F56A00] hover:underline"
+              >
+                {mode === 'signup' ? 'Sign in' : 'Create an account'}
+              </button>
             </p>
           </div>
         </div>
