@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { APIProvider, Map, Map3D, Marker3D, MapMode, AltitudeMode, AdvancedMarker, InfoWindow, Pin, useMap, useMap3D, useMapsLibrary } from '@vis.gl/react-google-maps'
-import { AlertCircle, ChevronLeft, Compass, ExternalLink, Globe, Image as ImageIcon, Loader2, MapPin, Maximize2, Minimize2, Navigation, RotateCcw, RotateCw, Star } from 'lucide-react'
+import { AlertCircle, ChevronLeft, Compass, ExternalLink, Globe, Image as ImageIcon, Loader2, MapPin, Maximize2, Minimize2, Navigation, RotateCcw, RotateCw, Share2, Star, Users } from 'lucide-react'
 import type { ItineraryStop, Place, Theme } from '@/lib/types'
 import type { CustomRouteConfig, MapAnnotations, TravelMode } from '@/lib/mapActions'
+import type { CommunityMapPin, CommunityFriend } from '@/components/community/useCommunityMapLayer'
 import {
   distanceKm,
   isValidCoord,
@@ -176,6 +177,19 @@ interface Props {
   onPlaceSave?: (place: Place) => void
   onPlaceRoute?: (index: number) => void
   savedPlaceIds?: Set<string>
+  /** Community layer: shared pins (with owner attribution) drawn as distinct blue markers. */
+  communityPins?: CommunityMapPin[]
+  /** Community layer: accepted connections sharing a fresh location (avatar + presence ring). */
+  communityFriends?: CommunityFriend[]
+  /** Community layer toggle state — the control renders when the handler is given. */
+  communityLayerOn?: boolean
+  onToggleCommunityLayer?: () => void
+  /** Open a traveller's profile sheet (pin attribution link / friend marker tap). */
+  onOpenProfile?: (handle: string) => void
+  /** One-shot center request from the community panel (shared-pin tap). */
+  communityFocus?: LatLng | null
+  /** Share action on the marker bubble / realistic card (opens the share picker). */
+  onPlaceShare?: (place: Place) => void
 }
 
 function RoutePolyline({ stops }: { stops: ItineraryStop[] }) {
@@ -1079,6 +1093,163 @@ function AnnotationMarkers({ markers, placeCoords = [] }: { markers: MapAnnotati
   )
 }
 
+/**
+ * Community shared pins — visually distinct from the orange numbered result
+ * pins: a blue-ringed round badge carrying the sharer's avatar emoji. Follows
+ * the AnnotationMarkers dedup rule: a shared pin that sits exactly on top of a
+ * current result marker is skipped, so the stacked-pin fix (535d429) holds.
+ */
+const COMMUNITY_BLUE = '#2E7DF6'
+
+function CommunityPinMarkers({
+  pins,
+  placeCoords = [],
+  onSelect,
+}: {
+  pins: CommunityMapPin[]
+  placeCoords?: LatLng[]
+  onSelect: (pinId: string) => void
+}) {
+  const onAPlace = (c: LatLng) =>
+    placeCoords.some((p) => Math.abs(p.lat - c.lat) < 2e-4 && Math.abs(p.lng - c.lng) < 2e-4)
+  // One marker per spot: if several shared pins stack (same place shared by
+  // two people), keep the first — the bubble still names its sharer.
+  const seen = new Set<string>()
+  return (
+    <>
+      {pins
+        .filter((p) => isValidCoord({ lat: p.lat, lng: p.lng }) && !onAPlace({ lat: p.lat, lng: p.lng }))
+        .filter((p) => {
+          const key = `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+        .map((pin) => (
+          <AdvancedMarker
+            key={`cpin-${pin.pin_id}`}
+            position={{ lat: pin.lat, lng: pin.lng }}
+            title={pin.owner ? `${pin.name} — shared by @${pin.owner.handle}` : pin.name}
+            zIndex={4}
+            onClick={() => onSelect(pin.pin_id)}
+          >
+            <div
+              className="flex h-8 w-8 items-center justify-center rounded-full border-2 bg-white text-[15px] leading-none shadow-md"
+              style={{ borderColor: COMMUNITY_BLUE }}
+            >
+              <span aria-hidden>{pin.owner?.avatar_emoji ?? '📍'}</span>
+            </div>
+          </AdvancedMarker>
+        ))}
+    </>
+  )
+}
+
+/** Info card for a selected community pin — attribution links to the profile sheet. */
+function CommunityPinBubble({
+  pin,
+  onOpenProfile,
+}: {
+  pin: CommunityMapPin
+  onOpenProfile?: (handle: string) => void
+}) {
+  return (
+    <div className="min-w-[180px] max-w-[250px] px-1 pb-1 pt-0.5">
+      <p className="mb-1 pr-5 text-[13px] font-semibold leading-snug text-gray-900">{pin.name}</p>
+      {pin.note && (
+        <p className="mb-1.5 text-[12px] leading-snug text-gray-600">&ldquo;{pin.note}&rdquo;</p>
+      )}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        {pin.owner ? (
+          <button
+            type="button"
+            title={`Open @${pin.owner.handle}'s profile`}
+            onClick={() => onOpenProfile?.(pin.owner!.handle)}
+            className="flex items-center gap-1.5 rounded-full border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-700 transition-colors hover:border-[#2E7DF6]/60 hover:text-[#2E7DF6]"
+          >
+            <span aria-hidden>{pin.owner.avatar_emoji}</span>
+            shared by @{pin.owner.handle}
+          </button>
+        ) : (
+          <span className="text-[11px] text-gray-500">Shared pin</span>
+        )}
+        {pin.rating != null && (
+          <span className="flex items-center gap-0.5 text-[11px] text-amber-600">
+            <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
+            {pin.rating}
+          </span>
+        )}
+      </div>
+      {pin.address && <p className="mt-1 text-[11px] text-gray-500">{pin.address}</p>}
+    </div>
+  )
+}
+
+/**
+ * Connections sharing their live location — small avatar-emoji badges with a
+ * presence ring (green online / gray away). Tapping one opens their profile.
+ */
+function CommunityFriendMarkers({
+  friends,
+  onOpenProfile,
+}: {
+  friends: CommunityFriend[]
+  onOpenProfile?: (handle: string) => void
+}) {
+  return (
+    <>
+      {friends
+        .filter((f) => isValidCoord({ lat: f.lat, lng: f.lng }))
+        .map((f) => (
+          <AdvancedMarker
+            key={`cfriend-${f.user_id}`}
+            position={{ lat: f.lat, lng: f.lng }}
+            title={`@${f.handle}${f.online ? ' — online' : ''}`}
+            zIndex={8}
+            onClick={() => onOpenProfile?.(f.handle)}
+          >
+            <div
+              className="flex h-7 w-7 items-center justify-center rounded-full border-2 bg-white text-[13px] leading-none shadow-md"
+              style={{ borderColor: f.online ? '#1FA463' : '#9CA3AF' }}
+            >
+              <span aria-hidden>{f.avatar_emoji}</span>
+            </div>
+          </AdvancedMarker>
+        ))}
+    </>
+  )
+}
+
+/** Round map control toggling the community layer (shared pins + connections). */
+function CommunityLayerToggle({
+  on,
+  onToggle,
+  compact,
+}: {
+  on: boolean
+  onToggle: () => void
+  compact: boolean
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      aria-label={on ? 'Hide community layer' : 'Show community layer'}
+      title={on ? 'Hide shared pins & connections' : 'Show shared pins & connections'}
+      onClick={onToggle}
+      className={`absolute z-[58] flex items-center justify-center rounded-full border shadow-md backdrop-blur transition-colors motion-reduce:transition-none ${
+        compact ? 'right-2 top-11 h-8 w-8' : 'right-4 top-20 h-10 w-10'
+      } ${
+        on
+          ? 'border-[#2E7DF6]/60 bg-white/95 text-[#2E7DF6] dark:border-[#2E7DF6]/60 dark:bg-[#15151a]/95'
+          : 'border-gray-200 bg-white/95 text-gray-600 hover:text-[#2E7DF6] dark:border-white/10 dark:bg-[#15151a]/95 dark:text-gray-300'
+      }`}
+    >
+      <Users className={compact ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+    </button>
+  )
+}
+
 /** Compact action bubble shown on the selected marker (full map). */
 function PlaceBubble({
   place,
@@ -1087,6 +1258,7 @@ function PlaceBubble({
   onFullDetails,
   onSave,
   onRoute,
+  onShare,
 }: {
   place: Place
   index: number
@@ -1094,13 +1266,14 @@ function PlaceBubble({
   onFullDetails?: (place: Place) => void
   onSave?: (place: Place) => void
   onRoute?: (index: number) => void
+  onShare?: (place: Place) => void
 }) {
   const btn =
-    'flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-[#F56A00]/50 hover:text-[#F56A00]'
+    'flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-[#F56A00]/50 hover:text-[#F56A00] max-md:h-10 max-md:w-10'
   return (
     <div className="min-w-[170px] max-w-[240px] px-1 pb-1 pt-0.5">
       <p className="mb-2 pr-5 text-[13px] font-semibold leading-snug text-gray-900">{place.name}</p>
-      <div className="flex items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         {onFullDetails && (
           <button type="button" title="Full details & photos" className={btn} onClick={() => onFullDetails(place)}>
             <ImageIcon className="h-4 w-4" />
@@ -1119,6 +1292,11 @@ function PlaceBubble({
         {onRoute && (
           <button type="button" title="Route from my location" className={btn} onClick={() => onRoute(index)}>
             <Navigation className="h-4 w-4" />
+          </button>
+        )}
+        {onShare && (
+          <button type="button" title="Share with connections" className={btn} onClick={() => onShare(place)}>
+            <Share2 className="h-4 w-4" />
           </button>
         )}
         {place.website && (
@@ -1312,6 +1490,7 @@ function RealisticPlaceCard({
   onFullDetails,
   onSave,
   onRoute,
+  onShare,
 }: {
   place: PlaceDetail
   index: number
@@ -1320,6 +1499,7 @@ function RealisticPlaceCard({
   onFullDetails?: (place: Place) => void
   onSave?: (place: Place) => void
   onRoute?: (index: number) => void
+  onShare?: (place: Place) => void
 }) {
   const photos = place.photos && place.photos.length > 0
     ? place.photos
@@ -1327,16 +1507,17 @@ function RealisticPlaceCard({
       ? [place.photo_url]
       : []
   const btn =
-    'flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-[#F56A00]/50 hover:text-[#F56A00] dark:border-white/15 dark:text-gray-300'
+    'flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-600 transition-colors hover:border-[#F56A00]/50 hover:text-[#F56A00] max-md:h-10 max-md:w-10 dark:border-white/15 dark:text-gray-300'
 
   return (
-    <div className="pointer-events-none absolute bottom-24 left-1/2 z-[58] w-[min(320px,calc(100%-2rem))] -translate-x-1/2">
+    // Mobile: bottom-44 lifts the card above the chat bottom sheet's peek.
+    <div className="pointer-events-none absolute bottom-44 left-1/2 z-[58] w-[min(320px,calc(100%-2rem))] -translate-x-1/2 md:bottom-24">
       <div className="pointer-events-auto rounded-2xl border border-gray-200 bg-white/95 p-3 shadow-[0_8px_30px_rgba(0,0,0,0.18)] backdrop-blur dark:border-white/10 dark:bg-[#15151a]/95">
         <button
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/40 text-white transition-colors hover:bg-black/60"
+          className="absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/40 text-white transition-colors hover:bg-black/60 max-md:h-9 max-md:w-9"
         >
           <span aria-hidden className="text-[13px] leading-none">×</span>
         </button>
@@ -1368,7 +1549,7 @@ function RealisticPlaceCard({
             <span className="text-[11px] text-gray-400">{place.price ?? place.price_level}</span>
           )}
         </div>
-        <div className="mt-2.5 flex items-center gap-1.5">
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
           {onFullDetails && (
             <button type="button" title="Full details & photos" className={btn} onClick={() => onFullDetails(place)}>
               <ImageIcon className="h-4 w-4" />
@@ -1387,6 +1568,11 @@ function RealisticPlaceCard({
           {onRoute && (
             <button type="button" title="Route from my location" className={btn} onClick={() => onRoute(index)}>
               <Navigation className="h-4 w-4" />
+            </button>
+          )}
+          {onShare && (
+            <button type="button" title="Share with connections" className={btn} onClick={() => onShare(place)}>
+              <Share2 className="h-4 w-4" />
             </button>
           )}
           {place.website && (
@@ -1493,6 +1679,13 @@ function MapCanvas({
   onPlaceSave,
   onPlaceRoute,
   savedPlaceIds,
+  communityPins,
+  communityFriends,
+  communityLayerOn = false,
+  onToggleCommunityLayer,
+  onOpenProfile,
+  communityFocus,
+  onPlaceShare,
 }: Omit<Props, 'onExpand' | 'onCollapse' | 'selectedPlace' | 'loading' | 'error' | 'onRetry' | 'bottomSlot'>) {
   const markers = itinerary ?? places
   const placeCoords = markers
@@ -1504,7 +1697,13 @@ function MapCanvas({
     ...(annotations?.markers ?? []).map((m) => m.coordinates),
     ...(annotations?.circles ?? []).map((c) => c.center),
   ].filter(isValidCoord)
-  const markerCoords = placeCoords.length > 0 ? placeCoords : annoCoords
+  // Community pins only anchor the camera when nothing else is on the map
+  // (layer toggled on with no active search) — they never affect result fits.
+  const communityCoords = (communityPins ?? [])
+    .map((p) => ({ lat: p.lat, lng: p.lng }))
+    .filter(isValidCoord)
+  const markerCoords =
+    placeCoords.length > 0 ? placeCoords : annoCoords.length > 0 ? annoCoords : communityCoords
   const firstPlace = markerCoords[0]
   const defaultCenter = firstPlace ?? KIGALI_DEFAULT
   const initialZoom = markerCoords.length > 0 ? 15 : DEFAULT_ZOOM
@@ -1536,6 +1735,14 @@ function MapCanvas({
   // quick actions, instead of slamming the full details panel open every click.
   const [bubbleOpen, setBubbleOpen] = useState(true)
   useEffect(() => { setBubbleOpen(true) }, [activeStopIndex])
+
+  // Community layer: selected shared pin (its own info bubble, independent of
+  // the result-marker bubble so the two never fight).
+  const [selectedCommunityPinId, setSelectedCommunityPinId] = useState<string | null>(null)
+  const selectedCommunityPin =
+    selectedCommunityPinId != null
+      ? (communityPins ?? []).find((p) => p.pin_id === selectedCommunityPinId) ?? null
+      : null
   const activePlace = activeStopIndex !== null ? markers[activeStopIndex] : null
   const showBubble =
     !isCompact && bubbleOpen && activeStopIndex !== null && !!activePlace && isValidCoord(activePlace.coordinates)
@@ -1570,6 +1777,7 @@ function MapCanvas({
               onFullDetails={onPlaceFullDetails}
               onSave={onPlaceSave}
               onRoute={onPlaceRoute}
+              onShare={onPlaceShare}
             />
           )}
         </>
@@ -1626,6 +1834,31 @@ function MapCanvas({
         )}
         {annotations && annotations.circles.length > 0 && <MapCircles circles={annotations.circles} />}
 
+        {/* Community layer: shared pins + connections' live positions. */}
+        {communityPins && communityPins.length > 0 && (
+          <CommunityPinMarkers
+            pins={communityPins}
+            placeCoords={placeCoords}
+            onSelect={setSelectedCommunityPinId}
+          />
+        )}
+        {selectedCommunityPin && (
+          <InfoWindow
+            position={{ lat: selectedCommunityPin.lat, lng: selectedCommunityPin.lng }}
+            pixelOffset={[0, -36]}
+            headerDisabled
+            onCloseClick={() => setSelectedCommunityPinId(null)}
+          >
+            <CommunityPinBubble pin={selectedCommunityPin} onOpenProfile={onOpenProfile} />
+          </InfoWindow>
+        )}
+        {communityFriends && communityFriends.length > 0 && (
+          <CommunityFriendMarkers friends={communityFriends} onOpenProfile={onOpenProfile} />
+        )}
+        {communityFocus && isValidCoord(communityFocus) && (
+          <MapZoomFocus position={communityFocus} enabled targetZoom={16} />
+        )}
+
         {showBubble && activePlace && (
           <InfoWindow
             position={activePlace.coordinates}
@@ -1640,6 +1873,7 @@ function MapCanvas({
               onFullDetails={onPlaceFullDetails}
               onSave={onPlaceSave}
               onRoute={onPlaceRoute}
+              onShare={onPlaceShare}
             />
           </InfoWindow>
         )}
@@ -1682,6 +1916,9 @@ function MapCanvas({
       )}
       {size === 'full' && <MapModeControl mode={mapMode} onChange={setMapMode} />}
       {size === 'full' && !realistic && mapMode !== 'satellite' && <MapRotateControls />}
+      {onToggleCommunityLayer && (
+        <CommunityLayerToggle on={communityLayerOn} onToggle={onToggleCommunityLayer} compact={isCompact} />
+      )}
     </APIProvider>
   )
 }
@@ -1706,7 +1943,9 @@ export function MapView({
     (itinerary?.length ?? 0) > 0 ||
     places.length > 0 ||
     (canvasProps.annotations?.markers?.length ?? 0) > 0 ||
-    (canvasProps.annotations?.circles?.length ?? 0) > 0
+    (canvasProps.annotations?.circles?.length ?? 0) > 0 ||
+    (canvasProps.communityPins?.length ?? 0) > 0 ||
+    (canvasProps.communityFriends?.length ?? 0) > 0
   const fallbackPlace = selectedPlace ?? places[0] ?? itinerary?.[0] ?? null
   const compactPx = 220
   const mapHeight = size === 'compact' ? 'h-full min-h-[220px]' : 'h-full'

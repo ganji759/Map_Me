@@ -83,7 +83,7 @@ export function PlaceCardStrip({ places, activeIndex, onSelect, onShowDetails, o
                 <button
                   type="button"
                   onClick={() => onShowDetails(place)}
-                  className="rounded-full bg-[#F56A00]/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#F56A00] transition-colors hover:bg-[#F56A00]/20 dark:bg-[#F56A00]/15 dark:text-[#FF8C2F] dark:hover:bg-[#F56A00]/25"
+                  className="rounded-full bg-[#F56A00]/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#F56A00] transition-colors hover:bg-[#F56A00]/20 max-md:py-2 dark:bg-[#F56A00]/15 dark:text-[#FF8C2F] dark:hover:bg-[#F56A00]/25"
                 >
                   Details
                 </button>
@@ -92,7 +92,7 @@ export function PlaceCardStrip({ places, activeIndex, onSelect, onShowDetails, o
                     type="button"
                     onClick={(e) => { e.stopPropagation(); onRouteFromMe(i) }}
                     title="Route from my location"
-                    className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-text2 transition-colors hover:border-[#F56A00]/40 hover:text-[#F56A00]"
+                    className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-text2 transition-colors hover:border-[#F56A00]/40 hover:text-[#F56A00] max-md:py-2"
                   >
                     <Navigation className="h-3 w-3" />
                     Route
@@ -105,7 +105,7 @@ export function PlaceCardStrip({ places, activeIndex, onSelect, onShowDetails, o
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
                     title="Restaurant website"
-                    className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-text2 transition-colors hover:border-[#F56A00]/40 hover:text-[#F56A00]"
+                    className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-text2 transition-colors hover:border-[#F56A00]/40 hover:text-[#F56A00] max-md:py-2"
                   >
                     <Globe className="h-3 w-3" />
                     Site
@@ -117,7 +117,7 @@ export function PlaceCardStrip({ places, activeIndex, onSelect, onShowDetails, o
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="ml-auto inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-text2 transition-colors hover:border-[#F56A00]/40 hover:text-[#F56A00]"
+                    className="ml-auto inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-text2 transition-colors hover:border-[#F56A00]/40 hover:text-[#F56A00] max-md:py-2"
                   >
                     <ExternalLink className="h-3 w-3" />
                     Maps

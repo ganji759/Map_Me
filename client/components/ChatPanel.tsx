@@ -7,6 +7,7 @@ import {
   CalendarPlus,
   ChevronDown,
   History,
+  LocateFixed,
   LogOut,
   Map as MapIcon,
   MapPin,
@@ -21,6 +22,7 @@ import {
   Square,
   Sun,
   Trash2,
+  Users,
   Volume2,
   VolumeX,
 } from 'lucide-react'
@@ -72,6 +74,16 @@ interface Props {
   theme: Theme
   onToggleTheme: () => void
   hasLocation: boolean
+  /** Manual "set my city" fallback in effect (GPS denied/unavailable). */
+  manualCity?: string | null
+  /** Explicit user-gesture location request — the only thing that may prompt. */
+  onUseMyLocation?: () => void
+  /** Store a typed city as the location fallback (empty string clears it). */
+  onSetCity?: (city: string) => void
+  /** Actionable geolocation failure message (denied / no GPS / timeout / http). */
+  locationNotice?: string | null
+  onDismissLocationNotice?: () => void
+  locationPending?: boolean
   speakReplies?: boolean
   speechOutSupported?: boolean
   onToggleSpeakReplies?: () => void
@@ -82,6 +94,8 @@ interface Props {
   onEnterVoiceMode?: () => void
   userName?: string
   onLogout?: () => void
+  /** Opens the community panel (people, encrypted chats, shared pins). */
+  onOpenCommunity?: () => void
 }
 
 const CHIPS = [
@@ -124,6 +138,12 @@ export function ChatPanel({
   theme,
   onToggleTheme,
   hasLocation,
+  manualCity,
+  onUseMyLocation,
+  onSetCity,
+  locationNotice,
+  onDismissLocationNotice,
+  locationPending = false,
   speakReplies,
   speechOutSupported,
   onToggleSpeakReplies,
@@ -134,6 +154,7 @@ export function ChatPanel({
   onEnterVoiceMode,
   userName,
   onLogout,
+  onOpenCommunity,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -146,6 +167,17 @@ export function ChatPanel({
   const [caretVisible, setCaretVisible] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
+  const [cityEditing, setCityEditing] = useState(false)
+  const [cityDraft, setCityDraft] = useState('')
+
+  function submitCity(e: React.FormEvent) {
+    e.preventDefault()
+    const city = cityDraft.trim()
+    if (!city) return
+    onSetCity?.(city)
+    setCityDraft('')
+    setCityEditing(false)
+  }
 
   function submitEdit() {
     const text = editText.trim()
@@ -264,11 +296,78 @@ export function ChatPanel({
           </button>
         </div>
       )}
-      {hasLocation && (
+      {hasLocation ? (
         <p className="mb-2 ml-1 flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-[#F56A00] dark:text-[#FF8C2F]">
           <MapPin className="h-3 w-3" />
           Location active
         </p>
+      ) : (onUseMyLocation || onSetCity) ? (
+        <div className="mb-2 ml-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+          {manualCity && !cityEditing && (
+            <span className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-[#F56A00] dark:text-[#FF8C2F]">
+              <MapPin className="h-3 w-3" />
+              City: {manualCity}
+            </span>
+          )}
+          {onUseMyLocation && (
+            <button
+              type="button"
+              onClick={onUseMyLocation}
+              disabled={locationPending}
+              className="flex min-h-[32px] items-center gap-1.5 rounded-full border border-[var(--border)] px-3 py-1 text-[11px] font-medium text-[var(--text-secondary)] transition-colors hover:border-[#F56A00]/40 hover:text-[#F56A00] disabled:opacity-50 max-md:min-h-[44px]"
+            >
+              <LocateFixed className={`h-3.5 w-3.5 ${locationPending ? 'animate-pulse' : ''}`} />
+              {locationPending ? 'Locating…' : 'Use my location'}
+            </button>
+          )}
+          {onSetCity && (
+            <button
+              type="button"
+              onClick={() => { setCityEditing((v) => !v); setCityDraft(manualCity ?? '') }}
+              className="flex min-h-[32px] items-center rounded-full border border-[var(--border)] px-3 py-1 text-[11px] font-medium text-[var(--text-secondary)] transition-colors hover:border-[#F56A00]/40 hover:text-[#F56A00] max-md:min-h-[44px]"
+            >
+              {manualCity ? 'Change city' : 'Set my city'}
+            </button>
+          )}
+        </div>
+      ) : null}
+      {locationNotice && (
+        <div
+          role="status"
+          className="mb-2 flex items-start gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-header)] px-3 py-2 text-[12px] leading-relaxed text-[var(--text-secondary)]"
+        >
+          <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#F56A00]" />
+          <span className="flex-1">{locationNotice}</span>
+          {onDismissLocationNotice && (
+            <button
+              type="button"
+              onClick={onDismissLocationNotice}
+              aria-label="Dismiss location message"
+              className="-m-1 shrink-0 p-1 text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
+      {cityEditing && onSetCity && !hasLocation && (
+        <form onSubmit={submitCity} className="mb-2 flex items-center gap-2">
+          <input
+            type="text"
+            value={cityDraft}
+            onChange={(e) => setCityDraft(e.target.value)}
+            placeholder="e.g. Kigali, or New York"
+            autoFocus
+            className="min-w-0 flex-1 rounded-full border border-[var(--border)] bg-[var(--bg-header)] px-4 py-2 text-[16px] text-[var(--text-primary)] outline-none transition-[border-color] focus:border-[#F56A00]/60 md:text-[13px]"
+          />
+          <button
+            type="submit"
+            disabled={!cityDraft.trim()}
+            className="min-h-[36px] rounded-full bg-[#F56A00] px-4 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-[#e05a1a] disabled:opacity-40 max-md:min-h-[44px]"
+          >
+            Set
+          </button>
+        </form>
       )}
       {voiceState === 'listening' && voiceLiveText && (
         <p className="mb-1.5 ml-1 truncate text-[12px] italic text-[var(--text-secondary)]">
@@ -291,7 +390,7 @@ export function ChatPanel({
               disabled={loading && voiceState === 'idle'}
               aria-label={voiceState === 'listening' ? 'Stop listening and send' : 'Start voice input'}
               title={voiceState === 'listening' ? 'Stop listening and send' : 'Start voice input'}
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40 ${
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40 max-md:h-11 max-md:w-11 ${
                 voiceState === 'listening'
                   ? 'bg-red-500 text-white'
                   : 'text-gray-500 hover:bg-[#F56A00]/10 hover:text-[#F56A00] dark:hover:bg-[#F56A00]/15'
@@ -310,7 +409,7 @@ export function ChatPanel({
               : voiceState === 'paused' ? 'Paused — tap Stop or the mic'
               : 'Time, budget, preferences, location…'
             }
-            className={`min-w-0 flex-1 bg-transparent py-3 text-[14px] text-[var(--text-primary)] outline-none ${
+            className={`min-w-0 flex-1 bg-transparent py-3 text-[16px] text-[var(--text-primary)] outline-none md:text-[14px] ${
               voiceActive ? 'placeholder:text-[#F56A00]/80' : 'placeholder:text-[var(--text-secondary)]'
             }`}
             disabled={loading}
@@ -321,7 +420,7 @@ export function ChatPanel({
               onClick={() => { onVoiceStop?.(); if (!onVoiceStop) onStop?.() }}
               aria-label="Stop"
               title="Stop voice and generation"
-              className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-red-500 px-3.5 text-[12px] font-medium text-white transition-colors hover:bg-red-600"
+              className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-red-500 px-3.5 text-[12px] font-medium text-white transition-colors hover:bg-red-600 max-md:h-11"
             >
               <Square className="h-3 w-3 fill-current" />
               Stop
@@ -331,7 +430,7 @@ export function ChatPanel({
               type="submit"
               disabled={loading}
               aria-label="Send message"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F56A00] text-white shadow-[0_2px_10px_rgba(245,106,0,0.35)] transition-all duration-150 hover:scale-105 hover:bg-[#e05a1a] active:scale-95 disabled:opacity-40 disabled:hover:scale-100 motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:scale-100"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F56A00] text-white shadow-[0_2px_10px_rgba(245,106,0,0.35)] transition-all duration-150 hover:scale-105 hover:bg-[#e05a1a] active:scale-95 disabled:opacity-40 disabled:hover:scale-100 motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:scale-100 max-md:h-11 max-md:w-11"
             >
               <Send className="h-4 w-4" />
             </button>
@@ -393,7 +492,7 @@ export function ChatPanel({
                       }}
                       autoFocus
                       rows={Math.min(6, Math.max(2, editText.split('\n').length))}
-                      className="w-full resize-none rounded-2xl border border-[#F56A00]/50 bg-[var(--bg-header)] px-4 py-2.5 text-[14px] text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[#F56A00]/30"
+                      className="w-full resize-none rounded-2xl border border-[#F56A00]/50 bg-[var(--bg-header)] px-4 py-2.5 text-[16px] text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-[#F56A00]/30 md:text-[14px]"
                     />
                     <div className="mt-1.5 flex justify-end gap-2">
                       <button type="button" onClick={() => setEditingId(null)} className="rounded-full px-3 py-1 text-[12px] text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]">
@@ -412,7 +511,7 @@ export function ChatPanel({
                         onClick={() => { setEditingId(msg.id); setEditText(msg.content) }}
                         title="Edit & resend"
                         aria-label="Edit and resend message"
-                        className="mb-1 shrink-0 rounded-full p-1 text-[var(--text-secondary)] opacity-0 transition-opacity hover:text-[#F56A00] group-hover:opacity-100"
+                        className="mb-1 shrink-0 rounded-full p-1 text-[var(--text-secondary)] opacity-0 transition-opacity hover:text-[#F56A00] group-hover:opacity-100 max-md:p-2 max-md:opacity-100"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
@@ -577,7 +676,7 @@ export function ChatPanel({
             value={historyQuery}
             onChange={(e) => setHistoryQuery(e.target.value)}
             placeholder="Search chats…"
-            className="mb-3 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-header)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none transition-[border-color,box-shadow] focus:border-[#F56A00]/60 focus:ring-2 focus:ring-[#F56A00]/20 motion-reduce:transition-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+            className="mb-3 w-full rounded-lg border border-[var(--border)] bg-[var(--bg-header)] px-3 py-2 text-[16px] text-[var(--text-primary)] outline-none transition-[border-color,box-shadow] focus:border-[#F56A00]/60 focus:ring-2 focus:ring-[#F56A00]/20 motion-reduce:transition-none md:text-[13px] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
           />
           <button
             type="button"
@@ -637,7 +736,7 @@ export function ChatPanel({
                       type="button"
                       onClick={(e) => { e.stopPropagation(); onDeleteHistory(item.id) }}
                       aria-label="Delete chat"
-                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--text-secondary)] opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--text-secondary)] opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100 max-md:p-2 max-md:opacity-100"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -695,7 +794,7 @@ export function ChatPanel({
                 onClick={onToggleSpeakReplies}
                 aria-label={speakReplies ? 'Mute spoken replies' : 'Speak replies aloud'}
                 title={speakReplies ? 'Mute spoken replies' : 'Speak replies aloud'}
-                className={`rounded-lg border p-1.5 transition-colors ${speakReplies ? 'border-[#F56A00]/50 text-[#F56A00]' : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00]'}`}
+                className={`rounded-lg border p-1.5 transition-colors max-md:p-2.5 ${speakReplies ? 'border-[#F56A00]/50 text-[#F56A00]' : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00]'}`}
               >
                 {speakReplies ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
               </button>
@@ -704,15 +803,26 @@ export function ChatPanel({
               type="button"
               onClick={onToggleTheme}
               aria-label="Toggle theme"
-              className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00]"
+              className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00] max-md:p-2.5"
             >
               {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
+            {onOpenCommunity && (
+              <button
+                type="button"
+                aria-label="Open community"
+                title="Community — people, chats & shared pins"
+                onClick={onOpenCommunity}
+                className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00] max-md:p-2.5"
+              >
+                <Users className="h-4 w-4" />
+              </button>
+            )}
             <button
               type="button"
               aria-label="Open chat history"
               onClick={() => setHistoryOpen((open) => !open)}
-              className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00]"
+              className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00] max-md:p-2.5"
             >
               <Menu className="h-4 w-4" />
             </button>
@@ -724,7 +834,7 @@ export function ChatPanel({
                   else if (mapVisible) onExpandMap()
                   else onOpenMapPanel()
                 }}
-                className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-1.5 text-[11px] uppercase tracking-wider text-[var(--text-secondary)] transition-colors hover:border-[#F56A00]/40 hover:text-[#F56A00]"
+                className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-1.5 text-[11px] uppercase tracking-wider text-[var(--text-secondary)] transition-colors hover:border-[#F56A00]/40 hover:text-[#F56A00] max-md:hidden"
               >
                 <MapIcon className="h-3.5 w-3.5" />
                 {mapExpanded ? 'Compact map' : mapVisible ? 'Full map' : 'Open map'}
@@ -732,7 +842,7 @@ export function ChatPanel({
             )}
             <ModelSwitcher selected={selectedModel} onChange={onModelChange} />
             {onCollapse && (
-              <button type="button" onClick={onCollapse} aria-label="Collapse chat" className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)]">
+              <button type="button" onClick={onCollapse} aria-label="Collapse chat" className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] max-md:p-2.5">
                 <PanelLeftClose className="h-4 w-4" />
               </button>
             )}

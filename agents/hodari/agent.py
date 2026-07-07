@@ -11,6 +11,7 @@ from .sub_agents.explorer import explorer_agent
 from .sub_agents.itinerary import itinerary_loop
 from .tools.map_control import map_control
 from .tools.maps_mcp import create_maps_toolset
+from .tools.community_mcp import community_mcp_enabled, create_community_toolset
 from .tools.fixtures import world_cup_venues
 from .tools.mongo_tools import load_user_profile, list_saved_places, plan_visit, save_place
 from .tools.pipeline_tool import HodariPipelineTool
@@ -344,6 +345,23 @@ city ("I'm in Kampala", "wrong city"). Re-search with the stated city + their GP
 location: …] in the message. Do NOT defend wrong pins from an earlier search.
 """
 
+COMMUNITY_INSTRUCTION = """
+
+═══ COMMUNITY (profiles, pins, reviews) ═══
+
+You have read-only community tools: get_user_profile, search_users, list_user_pins,
+list_place_reviews, get_taste_profile. Use them to personalize recommendations, e.g.
+check get_taste_profile before suggesting places, or surface list_place_reviews when
+discussing a spot friends have reviewed. Weave community signals in naturally ("two
+travellers rated this 5 stars").
+
+PRIVACY (by design, not a policy you can override): you have NO access to users'
+private conversations or messages — they are end-to-end encrypted and no tool can
+read them. If asked to look at someone's chats, say plainly that private messages
+are not visible to you. Never present emails or precise locations; the tools already
+withhold them.
+"""
+
 # The planning pipeline is exposed as an explicit TOOL, not an auto-transfer
 # sub-agent. With sub_agents=[_pipeline], ADK's auto-flow let the model silently
 # transfer control into the pipeline on almost any message, so the Map/Search
@@ -351,22 +369,35 @@ location: …] in the message. Do NOT defend wrong pins from an earlier search.
 # stays in conversation by default and only *calls* the pipeline when it decides
 # the user genuinely wants places or an itinerary. Control then returns here so the
 # orchestrator can present the result and keep the conversation going.
+_tools = [
+    load_user_profile,
+    map_control,
+    save_place,
+    plan_visit,
+    list_saved_places,
+    world_cup_venues,
+    create_maps_toolset(tools=["lookup_weather"]),
+    create_web_search_tool(),
+    HodariPipelineTool(agent=_pipeline),
+]
+
+# Community tools are opt-in (COMMUNITY_MCP_URL / COMMUNITY_MCP_ENABLED) so a
+# missing/downed community server never breaks startup. The toolset itself
+# connects lazily; construction failures only skip the community layer.
+_instruction = ORCHESTRATOR_INSTRUCTION
+if community_mcp_enabled():
+    try:
+        _tools.append(create_community_toolset())
+        _instruction = ORCHESTRATOR_INSTRUCTION + COMMUNITY_INSTRUCTION
+    except Exception as exc:  # pragma: no cover — defensive
+        print(f"[hodari] community MCP disabled (toolset init failed): {exc}")
+
 root_agent = LlmAgent(
     model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
     name="hodari",
     description="Hodari — tourist AI assistant for the 2026 FIFA World Cup",
-    instruction=ORCHESTRATOR_INSTRUCTION,
-    tools=[
-        load_user_profile,
-        map_control,
-        save_place,
-        plan_visit,
-        list_saved_places,
-        world_cup_venues,
-        create_maps_toolset(tools=["lookup_weather"]),
-        create_web_search_tool(),
-        HodariPipelineTool(agent=_pipeline),
-    ],
+    instruction=_instruction,
+    tools=_tools,
 )
 
 _plugins = [create_profiling_plugin()] if profiling_enabled() else []

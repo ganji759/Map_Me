@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { MessageSquare, Mic } from 'lucide-react'
 import { ChatPanel } from '@/components/ChatPanel'
 import { MapView, type RouteInfo } from '@/components/MapView'
@@ -10,7 +11,14 @@ import { PlaceDetailsPanel } from '@/components/PlaceDetailsPanel'
 import { streamChat, fetchSessionState, ChatGateError } from '@/lib/stream'
 import Paywall, { type GateState } from '@/components/Paywall'
 import { VoiceOrb } from '@/components/VoiceOrb'
-import { isValidCoord, pinsFarFromUser, requestUserLocation } from '@/lib/geo'
+import { MobileChatSheet, SHEET_PEEK_PX, type SheetSnap } from '@/components/MobileChatSheet'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import {
+  isValidCoord,
+  pinsFarFromUser,
+  queryGeoPermission,
+  requestUserLocationDetailed,
+} from '@/lib/geo'
 import {
   applyMapActions,
   applyAnnotationActions,
@@ -35,7 +43,24 @@ import { stripEmDashes } from '@/lib/text'
 import { speak, cancelSpeech, isSpeechOutputSupported } from '@/lib/voice'
 import { useVoice } from '@/hooks/useVoice'
 import { type ModelId } from '@/components/ModelSwitcher'
+import { useCommunityMapLayer } from '@/components/community/useCommunityMapLayer'
 import type { ChatMessage, Place, Itinerary, ItineraryStop, Theme } from '@/lib/types'
+
+// Community UI is lazy-loaded: the chunks (panel, profile sheet, share picker,
+// E2EE machinery) only download the first time a community surface opens, so
+// the core map/chat path pays ~zero cost when unused.
+const CommunityPanel = dynamic(
+  () => import('@/components/community/CommunityPanel').then((m) => m.CommunityPanel),
+  { ssr: false },
+)
+const ProfileSheet = dynamic(
+  () => import('@/components/community/profile/ProfileSheet').then((m) => m.ProfileSheet),
+  { ssr: false },
+)
+const SharePinDialog = dynamic(
+  () => import('@/components/community/SharePinDialog').then((m) => m.SharePinDialog),
+  { ssr: false },
+)
 
 function uid() { return Math.random().toString(36).slice(2) }
 
@@ -153,6 +178,9 @@ export default function LandingPage() {
   const [uiMode, setUiMode] = useState<'chat' | 'voice'>('chat')
   const [chatWidth, setChatWidth] = useState(380)
   const resizingRef = useRef(false)
+  // ── Mobile (<768px): map is the base layer, chat is a draggable bottom sheet
+  const isMobile = useIsMobile()
+  const [chatSnap, setChatSnap] = useState<SheetSnap>('half')
   const [selectedModel, setSelectedModel] = useState<ModelId>('gemini-3.5')
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === 'undefined') return 'light'
@@ -160,6 +188,14 @@ export default function LandingPage() {
     return saved === 'dark' ? 'dark' : 'light'
   })
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
+  // Manual "set my city" fallback when GPS is denied/unavailable (mobile).
+  // Piped into the chat context the same way coords are (see handleSend).
+  const [manualCity, setManualCity] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return localStorage.getItem('hodari_city') || null
+  })
+  const [geoNotice, setGeoNotice] = useState<string | null>(null)
+  const geoWatchIdRef = useRef<number | null>(null)
   const [routeFromUser, setRouteFromUser] = useState(false)
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null)
   const [routeError, setRouteError] = useState<string | null>(null)
@@ -189,6 +225,48 @@ export default function LandingPage() {
     if (typeof window === 'undefined') return new Set()
     try { return new Set(JSON.parse(localStorage.getItem('hodari_saved') ?? '[]')) } catch { return new Set() }
   })
+
+  // ── Community layer (panel, profile sheet, share picker, map overlays) ──────
+  // `communityMounted` keeps the lazy chunk mounted after first open so the
+  // sheet's close animation still plays; before that nothing is downloaded.
+  const [communityMounted, setCommunityMounted] = useState(false)
+  const [communityOpen, setCommunityOpen] = useState(false)
+  const [communityLayerOn, setCommunityLayerOn] = useState(
+    () => typeof window !== 'undefined' && localStorage.getItem('hodari_community_layer') === '1',
+  )
+  const [profileTarget, setProfileTarget] = useState<string | null>(null)
+  const [shareTarget, setShareTarget] = useState<Place | null>(null)
+  const [shareConversationId, setShareConversationId] = useState<string | null>(null)
+  const [communityFocus, setCommunityFocus] = useState<{ lat: number; lng: number } | null>(null)
+
+  useEffect(() => {
+    try { localStorage.setItem('hodari_community_layer', communityLayerOn ? '1' : '0') } catch { /* ignore */ }
+  }, [communityLayerOn])
+
+  // Pins load while the panel OR the map layer is on; connection positions
+  // poll (15s) only while the map layer is on. All polling stops otherwise.
+  const { pins: communityPins, friends: communityFriends, refreshPins } = useCommunityMapLayer({
+    pinsEnabled: communityLayerOn || communityOpen,
+    friendsEnabled: communityLayerOn,
+    userLocation,
+  })
+
+  const openCommunity = useCallback(() => {
+    setCommunityMounted(true)
+    setCommunityOpen(true)
+    // One panel at a time: community replaces the place-details overlay.
+    setDetailsPlace(null)
+  }, [])
+  const handleOpenProfile = useCallback((handle: string) => setProfileTarget(handle), [])
+  const handleToggleCommunityLayer = useCallback(() => setCommunityLayerOn((v) => !v), [])
+  /** Center the map on a community place (shared-pin tap in panel/profile). */
+  const handleCommunityFocusPlace = useCallback((lat: number, lng: number) => {
+    if (!isValidCoord({ lat, lng })) return
+    setCommunityLayerOn(true)
+    setMapVisible(true)
+    setCommunityFocus({ lat, lng })
+  }, [])
+  const handlePlaceShare = useCallback((place: Place) => setShareTarget(place), [])
 
   useEffect(() => {
     placesRef.current = places
@@ -327,9 +405,15 @@ export default function LandingPage() {
     }
 
     const attachGps = shouldAttachGps(text, userLocation, suppressGpsContext)
+    // Manual-city fallback rides the same seam: shouldAttachGps only gates on
+    // "a location exists" + text intent, so probe it with a sentinel coord.
+    const attachCity =
+      !attachGps && !!manualCity && shouldAttachGps(text, { lat: 1, lng: 1 }, suppressGpsContext)
     const enriched = attachGps && userLocation
       ? `${text}\n[User location: ${userLocation.lat.toFixed(5)}, ${userLocation.lng.toFixed(5)}]`
-      : text
+      : attachCity
+        ? `${text}\n[User city: ${manualCity}]`
+        : text
 
     const userMsg: ChatMessage = { id: uid(), role: 'user', content: text }
     setMessages((prev) => [...prev, userMsg])
@@ -614,7 +698,7 @@ export default function LandingPage() {
       setStreamingStarted(false)
       streamingStartedRef.current = false
     }
-  }, [userLocation, places, itinerary, activeStop, suppressGpsContext]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userLocation, manualCity, places, itinerary, activeStop, suppressGpsContext]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const applyMapEffects = useCallback((effects: MapActionEffects) => {
     if (effects.showUserOnMap !== undefined) setShowUserOnMap(effects.showUserOnMap)
@@ -634,15 +718,30 @@ export default function LandingPage() {
     if (effects.customRoute === null && effects.routeFromUser === false) { setRouteInfo(null); setRouteError(null) }
   }, [])
 
+  /** Follow the user once permission exists (no-op if a watch is running). */
+  const startGeoWatch = useCallback(() => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return
+    if (geoWatchIdRef.current != null) return
+    geoWatchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 60_000 },
+    )
+  }, [])
+
   const ensureUserLocation = useCallback(async (): Promise<boolean> => {
     if (userLocation) return true
     setLocationPending(true)
-    const loc = await requestUserLocation()
+    const res = await requestUserLocationDetailed()
     setLocationPending(false)
-    if (loc) { setUserLocation(loc); return true }
-    setRouteError('Allow location access in your browser (lock icon in the address bar), then tap Route from me again.')
+    if (res.ok) {
+      setUserLocation(res.location)
+      startGeoWatch()
+      return true
+    }
+    setRouteError(res.message)
     return false
-  }, [userLocation])
+  }, [userLocation, startGeoWatch])
 
   const handleMarkerClick = useCallback((index: number) => {
     setActiveStop(index)
@@ -682,6 +781,7 @@ export default function LandingPage() {
   const handlePlaceAsk = useCallback((index: number, prompt: string) => {
     setActiveStop(index)
     setChatCollapsed(false)
+    setChatSnap('half')
     handleSend(prompt)
   }, [handleSend])
 
@@ -704,6 +804,7 @@ export default function LandingPage() {
 
   const handleAsk = useCallback((_stopIndex: number, prompt: string) => {
     setChatCollapsed(false)
+    setChatSnap('half')
     handleSend(prompt)
   }, [handleSend])
 
@@ -745,6 +846,7 @@ export default function LandingPage() {
     setRouteFromUser(false)
     setCustomRoute(null)
     setDetailsPlace(null)
+    setCommunityFocus(null)
   }, [])
 
   const handleSelectHistory = useCallback((id: string) => {
@@ -770,6 +872,7 @@ export default function LandingPage() {
     setRouteFromUser(false)
     setCustomRoute(null)
     setDetailsPlace(null)
+    setCommunityFocus(null)
   }, [historyItems])
 
   const handleDeleteHistory = useCallback((id: string) => {
@@ -911,13 +1014,54 @@ export default function LandingPage() {
     localStorage.setItem('hodari_theme', theme)
   }, [theme])
 
+  // Geolocation: never prompt on page load — mobile browsers auto-deny or
+  // silently swallow un-gestured prompts (the old "AI can't get my location"
+  // bug). We only start watching automatically when the browser reports the
+  // permission is ALREADY granted; otherwise the user taps "Use my location"
+  // in the composer (see handleUseMyLocation), which is a real gesture.
   useEffect(() => {
-    if (!navigator.geolocation) return
-    const apply = (pos: GeolocationPosition) =>
-      setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-    navigator.geolocation.getCurrentPosition(apply, () => {}, { enableHighAccuracy: true, timeout: 20_000, maximumAge: 120_000 })
-    const watchId = navigator.geolocation.watchPosition(apply, () => {}, { enableHighAccuracy: true, maximumAge: 60_000 })
-    return () => navigator.geolocation.clearWatch(watchId)
+    let cancelled = false
+    queryGeoPermission().then((state) => {
+      if (cancelled || state !== 'granted') return
+      navigator.geolocation?.getCurrentPosition(
+        (pos) => { if (!cancelled) setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }) },
+        () => {},
+        { enableHighAccuracy: true, timeout: 20_000, maximumAge: 120_000 },
+      )
+      startGeoWatch()
+    })
+    return () => {
+      cancelled = true
+      if (geoWatchIdRef.current != null) {
+        navigator.geolocation?.clearWatch(geoWatchIdRef.current)
+        geoWatchIdRef.current = null
+      }
+    }
+  }, [startGeoWatch])
+
+  /** Explicit "Use my location" gesture — the only place that may prompt. */
+  const handleUseMyLocation = useCallback(async () => {
+    setGeoNotice(null)
+    setLocationPending(true)
+    const res = await requestUserLocationDetailed()
+    setLocationPending(false)
+    if (res.ok) {
+      setUserLocation(res.location)
+      startGeoWatch()
+    } else {
+      setGeoNotice(res.message)
+    }
+  }, [startGeoWatch])
+
+  /** Manual fallback: a typed city feeds the same location context seam. */
+  const handleSetCity = useCallback((city: string) => {
+    const clean = city.trim().slice(0, 80)
+    setManualCity(clean || null)
+    setGeoNotice(null)
+    try {
+      if (clean) localStorage.setItem('hodari_city', clean)
+      else localStorage.removeItem('hodari_city')
+    } catch { /* ignore */ }
   }, [])
 
   const handleStop = useCallback(() => {
@@ -968,7 +1112,27 @@ export default function LandingPage() {
     pinsFarFromUser(userLocation, places.map((p) => p.coordinates))
 
   const routeActive = routeFromUser || !!customRoute
-  const hasMapData = mapPlaces.length > 0
+  const communityLayerHasData =
+    communityLayerOn && (communityPins.length > 0 || communityFriends.length > 0)
+  const hasMapData = mapPlaces.length > 0 || communityLayerHasData
+
+  // ── Mobile sheet discipline ─────────────────────────────────────────────────
+  // When the map (base layer) first appears, drop the chat to its peek so the
+  // user actually sees the map they asked for; the reply shows in the peek.
+  const showMobileMap = isMobile && mapVisible && hasMapData
+  const prevShowMobileMapRef = useRef(false)
+  useEffect(() => {
+    if (showMobileMap && !prevShowMobileMapRef.current) setChatSnap('collapsed')
+    prevShowMobileMapRef.current = showMobileMap
+  }, [showMobileMap])
+
+  // One surface at a time on phones: any overlay (details, community, profile,
+  // share picker) minimizes the chat sheet underneath it.
+  const overlayOpen =
+    !!detailsPlace || communityOpen || !!profileTarget || !!shareTarget || !!shareConversationId
+  useEffect(() => {
+    if (isMobile && overlayOpen && showMobileMap) setChatSnap('collapsed')
+  }, [isMobile, overlayOpen, showMobileMap])
 
   // Edit a sent message + re-send it: drop that turn and everything after, then
   // resend the edited text so the AI answers it fresh.
@@ -1019,6 +1183,12 @@ export default function LandingPage() {
       theme={theme}
       onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
       hasLocation={!!userLocation}
+      manualCity={manualCity}
+      onUseMyLocation={handleUseMyLocation}
+      onSetCity={handleSetCity}
+      locationNotice={geoNotice}
+      onDismissLocationNotice={() => setGeoNotice(null)}
+      locationPending={locationPending}
       speakReplies={speakReplies}
       speechOutSupported={speechOutSupported}
       onToggleSpeakReplies={() => setSpeakReplies((v) => { const nv = !v; if (!nv) cancelSpeech(); return nv })}
@@ -1029,6 +1199,7 @@ export default function LandingPage() {
       onEnterVoiceMode={enterVoiceMode}
       userName={userName}
       onLogout={handleLogout}
+      onOpenCommunity={openCommunity}
     />
   )
 
@@ -1037,10 +1208,10 @@ export default function LandingPage() {
     : null
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden">
+    <div className="app-shell relative w-screen overflow-hidden">
 
       {/* Mode toggle when chat panel is collapsed on full-screen map */}
-      {mapExpanded && chatCollapsed && (
+      {!isMobile && mapExpanded && chatCollapsed && (
         <div className="fixed top-3 left-4 z-[300] flex items-center gap-1 rounded-full border border-border bg-surface/95 p-1 shadow-lg backdrop-blur-md">
           <button
             type="button"
@@ -1068,7 +1239,7 @@ export default function LandingPage() {
       )}
 
       {/* Compact layout: chat on the left, map + place list on the right */}
-      {!mapExpanded && (
+      {!isMobile && !mapExpanded && (
         <div className="absolute inset-0 flex animate-fade-up">
           <div className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
             {!mapVisible && (
@@ -1117,6 +1288,12 @@ export default function LandingPage() {
                   selectedPlace={selectedPlace}
                   routeInfo={routeInfo}
                   onDirections={activeStop != null ? () => handleRouteFromMe(activeStop) : undefined}
+                  communityPins={communityPins}
+                  communityFriends={communityFriends}
+                  communityLayerOn={communityLayerOn}
+                  onToggleCommunityLayer={handleToggleCommunityLayer}
+                  onOpenProfile={handleOpenProfile}
+                  communityFocus={communityFocus}
                 />
               </div>
               {routeActive && routeError && (
@@ -1138,7 +1315,7 @@ export default function LandingPage() {
 
       {/* Expanded full-screen map — `isolate` creates a stacking context so Google
           Maps' internal z-indices (up to ~1000002) don't escape and cover the chat */}
-      {mapExpanded && (
+      {!isMobile && mapExpanded && (
         <div className="absolute inset-0 isolate">
           <MapView
             places={mapPlaces as Place[]}
@@ -1160,6 +1337,13 @@ export default function LandingPage() {
             onPlaceSave={handleSavePlace}
             onPlaceRoute={handleRouteFromMe}
             savedPlaceIds={savedPlaceIds}
+            communityPins={communityPins}
+            communityFriends={communityFriends}
+            communityLayerOn={communityLayerOn}
+            onToggleCommunityLayer={handleToggleCommunityLayer}
+            onOpenProfile={handleOpenProfile}
+            communityFocus={communityFocus}
+            onPlaceShare={handlePlaceShare}
           />
           {pinsMismatch && (
             <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 max-w-md px-4 py-2 rounded-xl bg-surface/95 border border-gold/40 text-sm text-text backdrop-blur-md">
@@ -1214,7 +1398,7 @@ export default function LandingPage() {
       )}
 
       {/* Chat overlay on the expanded map — conversation stays reachable */}
-      {mapExpanded && !chatCollapsed && (
+      {!isMobile && mapExpanded && !chatCollapsed && (
         <div
           className="absolute top-0 bottom-0 left-0 z-[200] flex flex-col bg-bg/95 backdrop-blur-md border-r border-border animate-slide-left"
           style={{ width: chatWidth }}
@@ -1231,7 +1415,7 @@ export default function LandingPage() {
       )}
 
       {/* Collapsed chat pill on the expanded map */}
-      {mapExpanded && chatCollapsed && (
+      {!isMobile && mapExpanded && chatCollapsed && (
         <CollapsedReply
           content={lastAssistant?.content ?? null}
           loading={loading}
@@ -1241,7 +1425,7 @@ export default function LandingPage() {
       )}
 
       {/* Exit full map — back to the side-panel layout */}
-      {mapExpanded && (
+      {!isMobile && mapExpanded && (
         <button
           onClick={() => { setMapExpanded(false); setChatCollapsed(false) }}
           className="absolute top-4 right-4 z-[210] bg-bg/90 backdrop-blur-sm border border-border rounded-xl p-2 text-text2 hover:text-text hover:border-gold/40 transition-all"
@@ -1253,6 +1437,124 @@ export default function LandingPage() {
         </button>
       )}
 
+      {/* ── Mobile layout (<768px) ──────────────────────────────────────────
+          Map is the base layer; the chat rides in a draggable bottom sheet
+          (collapsed / half / full). Without map data the chat is full-screen. */}
+      {isMobile && !showMobileMap && (
+        <div className="absolute inset-0 flex animate-fade-up">
+          <div className="relative mx-auto flex h-full w-full max-w-2xl flex-col">
+            {chatPanel}
+          </div>
+        </div>
+      )}
+      {isMobile && showMobileMap && (
+        <>
+          <div className="absolute inset-0 isolate">
+            <MapView
+              places={mapPlaces as Place[]}
+              itinerary={itineraryStops}
+              annotations={annotations}
+              activeStopIndex={activeStop}
+              onMarkerClick={handleMarkerClick}
+              userLocation={userLocation}
+              theme={theme}
+              showUserLocation={showUserOnMap}
+              routeFromUser={routeFromUser}
+              customRoute={customRoute}
+              routeMode={routeMode}
+              onRouteInfo={setRouteInfo}
+              onRouteError={setRouteError}
+              zoomFocusOnActive={mapZoomFocus}
+              aiBusy={loading}
+              onPlaceFullDetails={setDetailsPlace}
+              onPlaceSave={handleSavePlace}
+              onPlaceRoute={handleRouteFromMe}
+              savedPlaceIds={savedPlaceIds}
+              communityPins={communityPins}
+              communityFriends={communityFriends}
+              communityLayerOn={communityLayerOn}
+              onToggleCommunityLayer={handleToggleCommunityLayer}
+              onOpenProfile={handleOpenProfile}
+              communityFocus={communityFocus}
+              onPlaceShare={handlePlaceShare}
+            />
+            {/* Status banners pinned near the top — clear of the bottom sheet */}
+            <div className="pointer-events-none absolute inset-x-3 top-16 z-[65] flex flex-col items-center gap-2">
+              {pinsMismatch && (
+                <div className="pointer-events-auto max-w-md rounded-xl border border-gold/40 bg-surface/95 px-4 py-2 text-[13px] text-text backdrop-blur-md">
+                  Pins look far from your GPS. Ask Hodari to search again in your city.
+                </div>
+              )}
+              {routeActive && routeError && (
+                <div className="pointer-events-auto max-w-md rounded-xl border border-red-500/40 bg-surface/95 px-4 py-2 text-[13px] text-text2 backdrop-blur-md">
+                  {routeError}
+                </div>
+              )}
+              {routeFromUser && locationPending && (
+                <div className="pointer-events-auto rounded-full border border-border bg-surface/95 px-4 py-2 text-[13px] text-text2 backdrop-blur-md">
+                  Getting your location…
+                </div>
+              )}
+              {routeActive && routeInfo && (
+                <div className="rounded-full border border-border bg-surface/95 px-4 py-2 text-[13px] text-text shadow-lg backdrop-blur-md">
+                  <span className="font-medium text-gold">{routeInfo.destinationName}</span>
+                  <span className="text-text2">
+                    {' · '}{routeInfo.distance}{' · '}{routeInfo.duration}
+                  </span>
+                </div>
+              )}
+            </div>
+            {/* Result / itinerary card strip — only while the sheet is a peek */}
+            {chatSnap === 'collapsed' && !itineraryStops && places.length > 0 && (
+              <div className="absolute inset-x-0 z-[55]" style={{ bottom: SHEET_PEEK_PX }}>
+                <PlaceCardStrip
+                  places={places}
+                  activeIndex={activeStop}
+                  onSelect={handleMarkerClick}
+                  onShowDetails={setDetailsPlace}
+                  onRouteFromMe={handleRouteFromMe}
+                  leftOffset={0}
+                />
+              </div>
+            )}
+            {chatSnap === 'collapsed' && itineraryStops && itineraryStops.length > 0 && (
+              <div className="absolute inset-x-0 z-[55]" style={{ bottom: SHEET_PEEK_PX }}>
+                <PlaceCardStrip
+                  places={itineraryStops.map((s) => ({ ...s, personalization_score: 0, categories: [] })) as Place[]}
+                  activeIndex={activeStop}
+                  onSelect={handleMarkerClick}
+                  onShowDetails={(stop) => setDetailsPlace(stop)}
+                  onRouteFromMe={handleRouteFromMe}
+                  leftOffset={0}
+                />
+              </div>
+            )}
+          </div>
+          <MobileChatSheet
+            snap={chatSnap}
+            onSnapChange={setChatSnap}
+            peek={
+              <button
+                type="button"
+                onClick={() => setChatSnap('half')}
+                className="min-h-[44px] w-full px-5 pb-3 text-left"
+              >
+                <p className="text-[11px] font-medium uppercase tracking-wider text-[#F56A00] dark:text-[#FF8C2F]">
+                  Hodari
+                </p>
+                <p className="mt-0.5 line-clamp-2 text-[13px] leading-snug text-[var(--text-secondary)]">
+                  {loading
+                    ? 'Working on it…'
+                    : lastAssistant?.content || 'Ask me about food, sights, or your matchday plan.'}
+                </p>
+              </button>
+            }
+          >
+            {chatPanel}
+          </MobileChatSheet>
+        </>
+      )}
+
       {/* In-app place details */}
       {detailsPlace?.place_id && (
         <PlaceDetailsPanel
@@ -1260,6 +1562,35 @@ export default function LandingPage() {
           fallbackName={detailsPlace.name}
           fallbackMapsUrl={`https://www.google.com/maps/search/?api=1&query=${detailsPlace.coordinates.lat},${detailsPlace.coordinates.lng}&query_place_id=${encodeURIComponent(detailsPlace.place_id)}`}
           onClose={() => setDetailsPlace(null)}
+          onShare={() => setShareTarget(detailsPlace)}
+        />
+      )}
+
+      {/* Community: people, encrypted chats, shared pins */}
+      {communityMounted && (
+        <CommunityPanel
+          open={communityOpen}
+          onClose={() => setCommunityOpen(false)}
+          currentUserId={USER_ID}
+          onFocusPlace={handleCommunityFocusPlace}
+          onSharePin={(conversationId) => setShareConversationId(conversationId)}
+          onOpenProfile={handleOpenProfile}
+        />
+      )}
+      {profileTarget && (
+        <ProfileSheet
+          userIdOrHandle={profileTarget}
+          onClose={() => setProfileTarget(null)}
+          onFocusPlace={(p) => handleCommunityFocusPlace(p.lat, p.lng)}
+        />
+      )}
+      {(shareTarget || shareConversationId) && (
+        <SharePinDialog
+          place={shareTarget}
+          conversationId={shareConversationId}
+          candidatePlaces={mapPlaces as Place[]}
+          onClose={() => { setShareTarget(null); setShareConversationId(null) }}
+          onShared={refreshPins}
         />
       )}
 
@@ -1268,7 +1599,7 @@ export default function LandingPage() {
       {/* Dedicated voice UI: a floating orb with the LIVE transcript of what the
           user is saying (browser STT streams interim words) + speak controls. */}
       {uiMode === 'voice' && (
-        <div className="fixed bottom-6 right-6 z-[60]">
+        <div className="fixed right-4 z-[130] bottom-[calc(env(safe-area-inset-bottom,0px)+10rem)] md:bottom-6 md:right-6">
           <VoiceOrb
             compact
             state={voice.voiceState}

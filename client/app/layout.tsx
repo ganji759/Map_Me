@@ -9,6 +9,14 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: '#0C0C0E',
+  width: 'device-width',
+  initialScale: 1,
+  // Stops iOS Safari's zoom-on-input-focus (inputs also use >=16px font on
+  // mobile). Pinch-zoom stays available on Android; iOS treats this as a
+  // focus-zoom opt-out.
+  maximumScale: 1,
+  // Draw under the notch/home indicator; padding uses env(safe-area-inset-*).
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

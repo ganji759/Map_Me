@@ -51,6 +51,33 @@ html, body {
   overflow: hidden;
 }
 
+/* App viewport height: 100dvh where supported so the iOS/Android URL bar and
+   on-screen keyboard don't leave the layout taller than the visible screen.
+   (100vh fallback for older browsers.) */
+.app-shell {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* Notch / home-indicator safe areas (viewport-fit=cover). */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+
+/* Momentum scrolling in panels on iOS. */
+.chat-scroll,
+.scrollbar-hide,
+.momentum-scroll {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Mobile bottom sheet ──────────────────────────────────────────────────── */
+.sheet-grabber {
+  width: 44px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgb(var(--color-border));
+}
+
 body {
   background: var(--bg-chat);
   color: var(--text-primary);

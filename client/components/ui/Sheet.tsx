@@ -23,7 +23,7 @@ export interface SheetProps {
 const ANCHOR: Record<Side, string> = {
   right: 'top-0 right-0 h-full w-full max-w-sm border-l',
   left: 'top-0 left-0 h-full w-full max-w-sm border-r',
-  bottom: 'bottom-0 inset-x-0 max-h-[85vh] rounded-t-2xl border-t',
+  bottom: 'bottom-0 inset-x-0 max-h-[85dvh] rounded-t-2xl border-t',
 }
 
 /** Sheet — slide-over panel (right/left/bottom). Esc + backdrop close, scroll-locked. */
@@ -53,7 +53,9 @@ export function Sheet({ open, onClose, side = 'right', title, children, classNam
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-50">
+        /* z-[220]: above the mobile chat bottom sheet (z-[120]) and the full-map
+           chrome, below the place-details modal (z-[250]). */
+        <div className="fixed inset-0 z-[220]">
           <motion.div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             variants={backdrop}
@@ -79,12 +81,12 @@ export function Sheet({ open, onClose, side = 'right', title, children, classNam
               <button
                 onClick={onClose}
                 aria-label="Close"
-                className={cn('ml-auto p-1.5 rounded-lg text-text3 hover:text-gold hover:bg-gold/5 transition-colors', focusRing)}
+                className={cn('ml-auto p-1.5 rounded-lg text-text3 hover:text-gold hover:bg-gold/5 transition-colors max-md:p-3', focusRing)}
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto scrollbar-hide p-5">{children}</div>
+            <div className="flex-1 overflow-y-auto scrollbar-hide p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]">{children}</div>
           </motion.div>
         </div>
       )}

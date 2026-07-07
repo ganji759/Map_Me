@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Clock, ExternalLink, MapPin, Star } from 'lucide-react'
+import { Clock, ExternalLink, MapPin, Share2, Star } from 'lucide-react'
 import type { Place } from '@/lib/types'
 
 const PLACES_NEW_ENABLED = process.env.NEXT_PUBLIC_PLACES_API_NEW === '1'
@@ -27,6 +27,8 @@ interface Props {
   fallbackMapsUrl: string
   fallbackPlace?: Place | null
   onClose: () => void
+  /** Community share action — opens the host's share-a-pin picker. */
+  onShare?: () => void
 }
 
 const PRICE_SYMBOL: Record<string, string> = {
@@ -112,6 +114,7 @@ export function PlaceDetailsPanel({
   fallbackMapsUrl,
   fallbackPlace,
   onClose,
+  onShare,
 }: Props) {
   const [lbOpen, setLbOpen] = useState(false)
   const [lbIndex, setLbIndex] = useState(0)
@@ -237,10 +240,11 @@ export function PlaceDetailsPanel({
       : null)
 
   return (
-    <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 animate-fade-up" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[250] flex items-end justify-center animate-fade-up p-0 md:items-center md:p-4" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-header)] shadow-2xl">
+      {/* Phone: full-width bottom sheet; md+: centered modal card. */}
+      <div className="relative flex max-h-[88dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-[var(--border)] bg-[var(--bg-header)] shadow-2xl md:rounded-2xl">
         <div className="relative h-44 shrink-0 overflow-hidden bg-gradient-to-br from-amber-50 to-[#ffffff] dark:from-amber-950/40 dark:to-slate-900">
           {data?.photoUrls?.length ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -284,7 +288,7 @@ export function PlaceDetailsPanel({
           </div>
         )}
 
-        <div className="scrollbar-hide overflow-y-auto p-5">
+        <div className="scrollbar-hide overflow-y-auto p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))]">
           <h2 className="font-display text-xl font-semibold leading-tight text-[var(--text-primary)]">
             {displayName}
           </h2>
@@ -360,6 +364,16 @@ export function PlaceDetailsPanel({
                     Open in Google Maps
                   </a>
                 )}
+                {onShare && (
+                  <button
+                    type="button"
+                    onClick={onShare}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3 py-1.5 text-[12px] text-[var(--text-secondary)] transition-colors hover:border-amber-400 hover:text-amber-600"
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                    Share
+                  </button>
+                )}
                 {data.website && (
                   <a
                     href={data.website}
@@ -400,7 +414,7 @@ export function PlaceDetailsPanel({
             <img
               src={data.photoUrls[lbIndex]}
               alt={`${displayName} photo ${lbIndex + 1} of ${data.photoUrls.length}`}
-              className="max-h-[70vh] max-w-full object-contain motion-reduce:transition-none"
+              className="max-h-[70dvh] max-w-full object-contain motion-reduce:transition-none"
               draggable={false}
             />
           </div>

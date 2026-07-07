@@ -33,21 +33,83 @@ export function pinsFarFromUser(user: LatLng, places: LatLng[], thresholdKm = 80
   return nearest > thresholdKm
 }
 
-export function requestUserLocation(): Promise<LatLng | null> {
+/** Why a geolocation request failed — mapped from GeolocationPositionError. */
+export type GeoFailure = 'denied' | 'unavailable' | 'timeout' | 'insecure' | 'unsupported'
+
+export type GeoResult =
+  | { ok: true; location: LatLng }
+  | { ok: false; reason: GeoFailure; message: string }
+
+/**
+ * Human-readable, actionable copy for each failure mode. Mobile browsers fail
+ * geolocation for very different reasons (permission vs. GPS vs. http), so the
+ * UI should never show a generic "location unavailable".
+ */
+export function describeGeoFailure(reason: GeoFailure): string {
+  switch (reason) {
+    case 'denied':
+      return 'Location is blocked for this site. Tap the lock (or AA) icon in your browser’s address bar, allow Location, then try again — or set your city below.'
+    case 'unavailable':
+      return 'Your device couldn’t get a position (GPS may be off or there’s no signal). Turn on device location services, or set your city below.'
+    case 'timeout':
+      return 'Getting a GPS fix took too long. Try again — it’s faster outdoors — or set your city below.'
+    case 'insecure':
+      return 'Location only works over a secure (https) connection. Open the https version of this site, or set your city below.'
+    case 'unsupported':
+      return 'This browser doesn’t support location. Set your city below instead.'
+  }
+}
+
+/**
+ * Pre-detect the geolocation permission state without prompting. Returns
+ * 'unknown' where the Permissions API is missing (older iOS Safari).
+ */
+export async function queryGeoPermission(): Promise<'granted' | 'prompt' | 'denied' | 'unknown'> {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) return 'unknown'
+  try {
+    const status = await navigator.permissions?.query?.({ name: 'geolocation' })
+    if (status?.state === 'granted' || status?.state === 'prompt' || status?.state === 'denied') {
+      return status.state
+    }
+  } catch {
+    /* Permissions API unsupported — fall through */
+  }
+  return 'unknown'
+}
+
+/**
+ * One-shot position request with a typed failure reason. Must be called from
+ * an explicit user gesture on mobile — browsers ignore or auto-deny prompts
+ * fired on page load.
+ */
+export function requestUserLocationDetailed(): Promise<GeoResult> {
   if (typeof navigator === 'undefined' || !navigator.geolocation) {
-    return Promise.resolve(null)
+    return Promise.resolve({ ok: false, reason: 'unsupported', message: describeGeoFailure('unsupported') })
+  }
+  if (typeof window !== 'undefined' && window.isSecureContext === false) {
+    return Promise.resolve({ ok: false, reason: 'insecure', message: describeGeoFailure('insecure') })
   }
   return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
       (pos) =>
-        resolve({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        }),
-      () => resolve(null),
+        resolve({ ok: true, location: { lat: pos.coords.latitude, lng: pos.coords.longitude } }),
+      (err) => {
+        const reason: GeoFailure =
+          err.code === err.PERMISSION_DENIED
+            ? 'denied'
+            : err.code === err.TIMEOUT
+              ? 'timeout'
+              : 'unavailable'
+        resolve({ ok: false, reason, message: describeGeoFailure(reason) })
+      },
       { enableHighAccuracy: true, timeout: 20_000, maximumAge: 120_000 },
     )
   })
+}
+
+export async function requestUserLocation(): Promise<LatLng | null> {
+  const res = await requestUserLocationDetailed()
+  return res.ok ? res.location : null
 }
 
 /**
