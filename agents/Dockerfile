@@ -50,4 +50,7 @@ ENV AGENT_SERVICE=orchestrator
 # root_agent (e.g. services/planner/__init__.py). ADK sees a single-agent dir,
 # so the exposed ADK app name is the leaf folder (planner | explorer | itinerary
 # | orchestrator) — which is exactly what the orchestrator's HTTP client targets.
-CMD ["sh", "-c", "adk api_server services/${AGENT_SERVICE} --port ${PORT} --host 0.0.0.0"]
+# AGENT_SERVICE=hodari is the MVP monolith and lives at the top level (hodari/),
+# not under services/, so fall back to that path when services/${AGENT_SERVICE}
+# doesn't exist in the image.
+CMD ["sh", "-c", "if [ -d \"services/${AGENT_SERVICE}\" ]; then adk api_server services/${AGENT_SERVICE} --port ${PORT} --host 0.0.0.0; else adk api_server ${AGENT_SERVICE} --port ${PORT} --host 0.0.0.0; fi"]
