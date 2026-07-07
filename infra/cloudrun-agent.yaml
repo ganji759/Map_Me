@@ -41,6 +41,11 @@ spec:
           value: hodari
         - name: MONGODB_MCP_URL
           value: http://localhost:3100/mcp
+        # Community MCP sidecar (read-only profile/pins/reviews/taste-profile
+        # tools for personalization). Setting this URL is what gates the
+        # toolset into the agent — see agents/hodari/tools/community_mcp.py.
+        - name: COMMUNITY_MCP_URL
+          value: http://localhost:3200/mcp
         - name: HODARI_PROFILING
           value: "0"
         - name: HODARI_CONTEXT_CACHE
@@ -71,6 +76,25 @@ spec:
             cpu: "0.5"
         env:
         - name: MDB_MCP_CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              name: MONGODB_URI
+              key: latest
+
+      # ── Community MCP sidecar (localhost:3200) ────────────────────────────
+      # No public port — reachable only from the main container over the
+      # shared network namespace, same as mongodb-mcp above. Read-only;
+      # structurally cannot read `messages`/`conversations` (see server.py).
+      - name: community-mcp
+        image: us-central1-docker.pkg.dev/mapsme-498314/hodari/community-mcp@sha256:02af8ce556d43325e116530a384cc62ee2ffe7815e6a14357977510714d03d42
+        resources:
+          limits:
+            memory: 256Mi
+            cpu: "0.5"
+        env:
+        - name: MONGODB_DATABASE
+          value: hodari
+        - name: MONGODB_URI
           valueFrom:
             secretKeyRef:
               name: MONGODB_URI
