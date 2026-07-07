@@ -17,7 +17,7 @@
  * expects a SERVER-VERIFIED id (from the session cookie via getSessionUser) —
  * routes must never pass a client-supplied id for the acting user.
  */
-import { mcpSession, mcpCall, ensureConnected, extractDocs } from '@/lib/mcp'
+import { mcpConnected, mcpCall, extractDocs } from '@/lib/mcp'
 
 const DB = process.env.MONGODB_DATABASE ?? 'hodari'
 
@@ -150,8 +150,7 @@ let indexesOnce: Promise<void> | null = null
 export function ensureCommunityIndexes(): Promise<void> {
   if (indexesOnce) return indexesOnce
   indexesOnce = (async () => {
-    const sid = await mcpSession()
-    await ensureConnected(sid)
+    const sid = await mcpConnected()
     const specs: Array<{ collection: string; keys: Record<string, unknown>; name: string }> = [
       { collection: 'users', keys: { handle: 1 }, name: 'community_handle' },
       { collection: 'users', keys: { location: '2dsphere' }, name: 'community_location_2dsphere' },
@@ -182,9 +181,8 @@ async function mcp(): Promise<string> {
   // Fire-and-forget: don't block reads on index creation, but make sure it
   // happens once per process.
   void ensureCommunityIndexes()
-  const sid = await mcpSession()
-  await ensureConnected(sid)
-  return sid
+  // Reuse the cached, connected session — no per-call initialize + connect.
+  return mcpConnected()
 }
 
 function nowIso(): string {
@@ -431,7 +429,21 @@ export function relationTo(callerId: string, edges: Connection[], otherId: strin
 
 export type ConnectionActionResult =
   | { ok: true; connection: Connection }
-  | { ok: false; reason: 'not_found' | 'self' | 'already_connected' | 'already_pending' | 'blocked' | 'no_pending' }
+  | {
+      ok: false
+      reason:
+        | 'not_found'
+        | 'self'
+        | 'already_connected'
+        | 'already_pending'
+        | 'blocked'
+        | 'no_pending'
+        | 'no_connection'
+        | 'no_block'
+    }
+
+/** Actions the recipient/owner takes on an existing edge (everything but invite). */
+export type RespondAction = 'accept' | 'decline' | 'block' | 'cancel' | 'remove' | 'unblock'
 
 export async function inviteConnection(requesterId: string, recipientId: string): Promise<ConnectionActionResult> {
   if (requesterId === recipientId) return { ok: false, reason: 'self' }
@@ -462,21 +474,51 @@ export async function inviteConnection(requesterId: string, recipientId: string)
 export async function respondConnection(
   userId: string,
   otherId: string,
-  action: 'accept' | 'decline' | 'block',
+  action: RespondAction,
 ): Promise<ConnectionActionResult> {
   if (userId === otherId) return { ok: false, reason: 'self' }
   const sid = await mcp()
   const edge = await getConnection(userId, otherId)
 
+  const deletePair = () =>
+    mcpCall(sid, 'delete-many', { database: DB, collection: 'connections', filter: pairFilter(userId, otherId) })
+
   if (action === 'block') {
     // Replace any existing edge with a block owned by the blocker. Only the
     // blocker's edge direction records who did the blocking.
-    if (edge) await mcpCall(sid, 'delete-many', { database: DB, collection: 'connections', filter: pairFilter(userId, otherId) })
+    if (edge) await deletePair()
     const blocked: Connection = {
       requester_id: userId, recipient_id: otherId, status: 'blocked', created_at: nowIso(), responded_at: nowIso(),
     }
     await mcpCall(sid, 'insert-many', { database: DB, collection: 'connections', documents: [{ ...blocked }] })
     return { ok: true, connection: blocked }
+  }
+
+  if (action === 'unblock') {
+    // Only the blocker (who owns the edge direction) can lift their block.
+    if (!edge || edge.status !== 'blocked' || edge.requester_id !== userId) {
+      return { ok: false, reason: 'no_block' }
+    }
+    await deletePair()
+    return { ok: true, connection: { ...edge, status: 'pending', responded_at: nowIso() } }
+  }
+
+  if (action === 'cancel') {
+    // Withdraw the caller's own outgoing pending invite.
+    if (!edge || edge.status !== 'pending' || edge.requester_id !== userId) {
+      return { ok: false, reason: 'no_pending' }
+    }
+    await deletePair()
+    return { ok: true, connection: { ...edge, status: 'pending', responded_at: nowIso() } }
+  }
+
+  if (action === 'remove') {
+    // Unfriend: drop an accepted edge without blocking. Either party may remove.
+    if (!edge || edge.status !== 'accepted') {
+      return { ok: false, reason: 'no_connection' }
+    }
+    await deletePair()
+    return { ok: true, connection: { ...edge, status: 'pending', responded_at: nowIso() } }
   }
 
   // accept / decline require a pending invite addressed to the caller.
@@ -485,7 +527,7 @@ export async function respondConnection(
   }
 
   if (action === 'decline') {
-    await mcpCall(sid, 'delete-many', { database: DB, collection: 'connections', filter: pairFilter(userId, otherId) })
+    await deletePair()
     return { ok: true, connection: { ...edge, status: 'pending', responded_at: nowIso() } }
   }
 
@@ -532,8 +574,10 @@ export async function searchUsers(callerId: string, query: string): Promise<User
   if (!q) return []
   const sid = await mcp()
   const prefix = `^${escapeRegex(q)}`
-  const docs = extractDocs(
-    await mcpCall(sid, 'find', {
+  // The user search and the caller's connection edges are independent — run them
+  // concurrently instead of one after the other.
+  const [docs, edges] = await Promise.all([
+    mcpCall(sid, 'find', {
       database: DB,
       collection: 'users',
       filter: {
@@ -547,9 +591,9 @@ export async function searchUsers(callerId: string, query: string): Promise<User
       },
       projection: { user_id: 1, handle: 1, name: 1, avatar_emoji: 1, bio: 1, last_seen_at: 1 },
       limit: 20,
-    }),
-  )
-  const edges = await listConnections(callerId)
+    }).then(extractDocs),
+    listConnections(callerId),
+  ])
   return docs.map((d) => toSummary(d, callerId, edges)).filter((u) => u.connection !== 'blocked')
 }
 
@@ -560,12 +604,16 @@ export async function searchUsers(callerId: string, query: string): Promise<User
  */
 export async function usersNear(callerId: string): Promise<UserSummary[]> {
   const sid = await mcp()
+  // The caller's own doc is needed first (its location anchors the $near query),
+  // so this read can't be parallelized with the search itself.
   const me = await findUserDoc(sid, callerId)
   const myLoc = me && me.share_location === true ? toGeoPoint(me.location) : null
   if (!myLoc) return []
   try {
-    const docs = extractDocs(
-      await mcpCall(sid, 'find', {
+    // The $near search and the caller's connection edges are independent — run
+    // them concurrently.
+    const [docs, edges] = await Promise.all([
+      mcpCall(sid, 'find', {
         database: DB,
         collection: 'users',
         filter: {
@@ -576,9 +624,9 @@ export async function usersNear(callerId: string): Promise<UserSummary[]> {
         },
         projection: { user_id: 1, handle: 1, name: 1, avatar_emoji: 1, bio: 1, last_seen_at: 1 },
         limit: 20,
-      }),
-    )
-    const edges = await listConnections(callerId)
+      }).then(extractDocs),
+      listConnections(callerId),
+    ])
     return docs.map((d) => toSummary(d, callerId, edges)).filter((u) => u.connection !== 'blocked')
   } catch (err) {
     console.warn('[community] $near query failed (2dsphere index missing?)', err)

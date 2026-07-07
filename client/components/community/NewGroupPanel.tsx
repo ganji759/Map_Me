@@ -79,7 +79,7 @@ export function NewGroupPanel({ currentUserId, myPubkey, accepted, onBack, onCre
       const memberPubkeys: Record<string, JsonWebKey> = { [currentUserId]: myPubkey }
       for (const id of memberIds) {
         const pub = pubkeys?.[id]
-        if (!pub) throw new Error('A selected member has no encryption key yet — deselect them and retry.')
+        if (!pub) throw new Error('A member has no encryption key yet. Remove them and retry.')
         memberPubkeys[id] = pub
       }
       const { key, wrappedKeys } = await createConversationKey(memberPubkeys)
@@ -139,7 +139,7 @@ export function NewGroupPanel({ currentUserId, myPubkey, accepted, onBack, onCre
         {candidates.length === 0 ? (
           <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-4 py-6 text-center">
             <Users className="h-5 w-5 text-text3" aria-hidden />
-            <p className="text-[12.5px] text-text3">Connect with travellers first — groups are built from your connections.</p>
+            <p className="text-[12.5px] text-text3">Connect with travellers first.</p>
           </div>
         ) : (
           <ul className="flex flex-col gap-1.5">
@@ -200,10 +200,10 @@ export function NewGroupPanel({ currentUserId, myPubkey, accepted, onBack, onCre
           focusRing,
         )}
       >
-        {creating ? 'Creating…' : 'Create encrypted group'}
+        {creating ? 'Creating…' : 'Create group'}
       </button>
       <p className="-mt-2 text-center text-[11px] leading-relaxed text-text3">
-        Messages are end-to-end encrypted — only members&apos; devices can read them.
+        Messages are end-to-end encrypted.
       </p>
     </div>
   )

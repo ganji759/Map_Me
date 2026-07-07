@@ -16,7 +16,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { MapPin, Pencil, ShieldOff, UserCheck, UserPlus } from 'lucide-react'
+import { MapPin, Pencil, ShieldCheck, ShieldOff, UserCheck, UserMinus, UserPlus, X } from 'lucide-react'
 import { cn } from '@/lib/design/cn'
 import { focusRing } from '@/lib/design/tokens'
 import { Sheet } from '@/components/ui/Sheet'
@@ -174,7 +174,7 @@ export function ProfileSheet({ userIdOrHandle, onClose, onFocusPlace }: ProfileS
   }, [userIdOrHandle])
 
   const act = useCallback(
-    async (action: 'invite' | 'accept' | 'decline' | 'block') => {
+    async (action: 'invite' | 'accept' | 'decline' | 'block' | 'cancel' | 'remove' | 'unblock') => {
       if (!profile || acting) return
       setActing(true)
       setActionError(null)
@@ -194,6 +194,9 @@ export function ProfileSheet({ userIdOrHandle, onClose, onFocusPlace }: ProfileS
           accept: 'accepted',
           decline: 'none',
           block: 'blocked',
+          cancel: 'none',
+          remove: 'none',
+          unblock: 'none',
         }
         // An invite of a reciprocal pending invite auto-accepts server-side.
         const conn = data.connection as { status?: string } | undefined
@@ -236,7 +239,7 @@ export function ProfileSheet({ userIdOrHandle, onClose, onFocusPlace }: ProfileS
 
       {status === 'not_found' && (
         <p className="py-8 text-[13px] text-text2">
-          This profile isn&apos;t available — it may be private or no longer exist.
+          Profile unavailable. It may be private.
         </p>
       )}
       {status === 'error' && (
@@ -296,17 +299,45 @@ export function ProfileSheet({ userIdOrHandle, onClose, onFocusPlace }: ProfileS
                 )}
               >
                 <Pencil className="h-3.5 w-3.5" />
-                Edit profile
+                Edit
               </button>
             ) : relation === 'accepted' ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-green/40 bg-green/10 px-3.5 py-2 text-[12px] font-medium text-green">
-                <UserCheck className="h-3.5 w-3.5" />
-                Connected
-              </span>
+              <>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-green/40 bg-green/10 px-3.5 py-2 text-[12px] font-medium text-green">
+                  <UserCheck className="h-3.5 w-3.5" />
+                  Connected
+                </span>
+                <button
+                  type="button"
+                  disabled={acting}
+                  onClick={() => void act('remove')}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-2 text-[12px] text-text2 transition-colors hover:border-danger/50 hover:text-danger disabled:opacity-60',
+                    focusRing,
+                  )}
+                >
+                  <UserMinus className="h-3.5 w-3.5" />
+                  Remove
+                </button>
+              </>
             ) : relation === 'pending_out' ? (
-              <span className="inline-flex items-center rounded-full border border-border px-3.5 py-2 text-[12px] text-text2">
-                Invite sent
-              </span>
+              <>
+                <span className="inline-flex items-center rounded-full border border-border px-3.5 py-2 text-[12px] text-text2">
+                  Invite sent
+                </span>
+                <button
+                  type="button"
+                  disabled={acting}
+                  onClick={() => void act('cancel')}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-2 text-[12px] text-text2 transition-colors hover:border-danger/50 hover:text-danger disabled:opacity-60',
+                    focusRing,
+                  )}
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Cancel
+                </button>
+              </>
             ) : relation === 'pending_in' ? (
               <>
                 <button
@@ -319,7 +350,7 @@ export function ProfileSheet({ userIdOrHandle, onClose, onFocusPlace }: ProfileS
                   )}
                 >
                   <UserCheck className="h-3.5 w-3.5" />
-                  Accept invite
+                  Accept
                 </button>
                 <button
                   type="button"
@@ -334,10 +365,24 @@ export function ProfileSheet({ userIdOrHandle, onClose, onFocusPlace }: ProfileS
                 </button>
               </>
             ) : relation === 'blocked' ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-2 text-[12px] text-text3">
-                <ShieldOff className="h-3.5 w-3.5" />
-                Blocked
-              </span>
+              <>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-2 text-[12px] text-text3">
+                  <ShieldOff className="h-3.5 w-3.5" />
+                  Blocked
+                </span>
+                <button
+                  type="button"
+                  disabled={acting}
+                  onClick={() => void act('unblock')}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full border border-border px-3.5 py-2 text-[12px] text-text2 transition-colors hover:border-gold/40 hover:text-gold disabled:opacity-60',
+                    focusRing,
+                  )}
+                >
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Unblock
+                </button>
+              </>
             ) : (
               <button
                 type="button"
@@ -386,7 +431,7 @@ export function ProfileSheet({ userIdOrHandle, onClose, onFocusPlace }: ProfileS
             </p>
             {pins.length === 0 ? (
               <p className="text-[12.5px] text-text3">
-                {isSelf ? 'No pins yet — save a place from the map.' : 'No shared places yet.'}
+                {isSelf ? 'No pins yet.' : 'No shared places yet.'}
               </p>
             ) : (
               <ul className="flex flex-col gap-2">

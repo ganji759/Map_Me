@@ -128,9 +128,16 @@ export async function getConnections(): Promise<ConnectionsView> {
   return request<ConnectionsView>('/api/community/connections')
 }
 
-export type ConnectionAction = 'invite' | 'accept' | 'decline' | 'block'
+export type ConnectionAction =
+  | 'invite'
+  | 'accept'
+  | 'decline'
+  | 'block'
+  | 'cancel'
+  | 'remove'
+  | 'unblock'
 
-/** Invite / accept / decline / block. Throws 409 CommunityApiError on conflicts. */
+/** Invite / accept / decline / block / cancel / remove / unblock. Throws 409 on conflicts. */
 export async function connectionAction(action: ConnectionAction, userId: string): Promise<Connection> {
   const { connection } = await request<{ ok: true; connection: Connection }>('/api/community/connections', {
     method: 'POST',

@@ -44,6 +44,7 @@ import { speak, cancelSpeech, isSpeechOutputSupported } from '@/lib/voice'
 import { useVoice } from '@/hooks/useVoice'
 import { type ModelId } from '@/components/ModelSwitcher'
 import { useCommunityMapLayer } from '@/components/community/useCommunityMapLayer'
+import { getConnections } from '@/lib/communityClient'
 import type { ChatMessage, Place, Itinerary, ItineraryStop, Theme } from '@/lib/types'
 
 // Community UI is lazy-loaded: the chunks (panel, profile sheet, share picker,
@@ -238,10 +239,34 @@ export default function LandingPage() {
   const [shareTarget, setShareTarget] = useState<Place | null>(null)
   const [shareConversationId, setShareConversationId] = useState<string | null>(null)
   const [communityFocus, setCommunityFocus] = useState<{ lat: number; lng: number } | null>(null)
+  // Pending-invite count for the header badge. Sourced two ways: this
+  // standalone poll (so the badge works before the panel is ever opened —
+  // CommunityPanel only mounts on first open) and, once mounted, the panel's
+  // own connections state via onInviteCountChange (immediate, no poll lag).
+  const [communityInviteCount, setCommunityInviteCount] = useState(0)
 
   useEffect(() => {
     try { localStorage.setItem('hodari_community_layer', communityLayerOn ? '1' : '0') } catch { /* ignore */ }
   }, [communityLayerOn])
+
+  useEffect(() => {
+    if (communityMounted) return // the panel is now the source of truth
+    let cancelled = false
+    const tick = () => {
+      if (document.visibilityState !== 'visible') return
+      void getConnections()
+        .then((conns) => { if (!cancelled) setCommunityInviteCount(conns.pending_in.length) })
+        .catch(() => { /* not signed in yet, or transient — next tick retries */ })
+    }
+    tick()
+    const interval = setInterval(tick, 30_000)
+    document.addEventListener('visibilitychange', tick)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', tick)
+    }
+  }, [communityMounted])
 
   // Pins load while the panel OR the map layer is on; connection positions
   // poll (15s) only while the map layer is on. All polling stops otherwise.
@@ -1200,6 +1225,7 @@ export default function LandingPage() {
       userName={userName}
       onLogout={handleLogout}
       onOpenCommunity={openCommunity}
+      communityInviteCount={communityInviteCount}
     />
   )
 
@@ -1575,6 +1601,7 @@ export default function LandingPage() {
           onFocusPlace={handleCommunityFocusPlace}
           onSharePin={(conversationId) => setShareConversationId(conversationId)}
           onOpenProfile={handleOpenProfile}
+          onInviteCountChange={setCommunityInviteCount}
         />
       )}
       {profileTarget && (

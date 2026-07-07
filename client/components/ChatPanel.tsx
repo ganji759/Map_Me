@@ -96,6 +96,8 @@ interface Props {
   onLogout?: () => void
   /** Opens the community panel (people, encrypted chats, shared pins). */
   onOpenCommunity?: () => void
+  /** Pending invite count shown as a badge on the community icon. */
+  communityInviteCount?: number
 }
 
 const CHIPS = [
@@ -155,6 +157,7 @@ export function ChatPanel({
   userName,
   onLogout,
   onOpenCommunity,
+  communityInviteCount,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -810,12 +813,24 @@ export function ChatPanel({
             {onOpenCommunity && (
               <button
                 type="button"
-                aria-label="Open community"
-                title="Community — people, chats & shared pins"
+                aria-label={
+                  communityInviteCount
+                    ? `Open community, ${communityInviteCount} pending invite${communityInviteCount === 1 ? '' : 's'}`
+                    : 'Open community'
+                }
+                title="Community"
                 onClick={onOpenCommunity}
-                className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00] max-md:p-2.5"
+                className="relative rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00] max-md:p-2.5"
               >
                 <Users className="h-4 w-4" />
+                {!!communityInviteCount && (
+                  <span
+                    aria-hidden
+                    className="absolute -right-0.5 -top-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#F56A00] text-[9px] font-semibold leading-none text-white"
+                  >
+                    {communityInviteCount > 9 ? '9+' : communityInviteCount}
+                  </span>
+                )}
               </button>
             )}
             <button

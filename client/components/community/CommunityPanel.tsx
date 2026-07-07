@@ -28,7 +28,7 @@
  *   ConversationThread). All intervals are cleaned up on close/unmount.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ShieldAlert } from 'lucide-react'
+import { ChevronRight, ShieldAlert } from 'lucide-react'
 import { Sheet } from '@/components/ui/Sheet'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
 import type { Conversation, ConversationSummary, PresenceInfo, UserAttribution } from '@/lib/community'
@@ -47,6 +47,7 @@ import {
 } from '@/lib/communityClient'
 import { ensureKeypair, createConversationKey, E2EEUnavailableError } from '@/lib/e2ee'
 import { registerConversationKey } from './conversationKeys'
+import { EmojiAvatar } from './EmojiAvatar'
 import { PeopleTab } from './PeopleTab'
 import { ConversationList } from './ConversationList'
 import { ConversationThread } from './ConversationThread'
@@ -66,6 +67,13 @@ export interface CommunityPanelProps {
   onSharePin?: (conversationId: string) => void
   /** Open the full profile sheet (components/community/profile/ProfileSheet). */
   onOpenProfile?: (handle: string) => void
+  /**
+   * Fires whenever the pending-invite count is known, so the host can badge
+   * the entry point (e.g. the chat header's Users icon) even before this
+   * panel has ever been mounted — see LandingPage's standalone poll, which
+   * this callback supersedes once the panel is open.
+   */
+  onInviteCountChange?: (count: number) => void
 }
 
 type E2eeState =
@@ -107,7 +115,7 @@ export function usePresenceHeartbeat(enabled: boolean): void {
 }
 
 export function CommunityPanel(props: CommunityPanelProps) {
-  const { open, onClose, currentUserId, onSharePin, onOpenProfile } = props
+  const { open, onClose, currentUserId, onSharePin, onOpenProfile, onInviteCountChange } = props
 
   const [tab, setTab] = useState<'people' | 'chats'>('people')
   const [e2ee, setE2ee] = useState<E2eeState>({ status: 'init' })
@@ -248,7 +256,7 @@ export function CommunityPanel(props: CommunityPanelProps) {
         const keys = await getPubkeys([user.user_id])
         const theirPub = keys[user.user_id]
         if (!theirPub) {
-          setNotice(`@${user.handle} hasn’t set up encrypted chat yet — ask them to open Community once.`)
+          setNotice(`@${user.handle} hasn’t set up encrypted chat yet.`)
           return
         }
         const { key, wrappedKeys } = await createConversationKey({
@@ -294,6 +302,11 @@ export function CommunityPanel(props: CommunityPanelProps) {
       ),
     [conversations, activeConv],
   )
+  const pendingInviteCount = connections?.pending_in.length ?? 0
+
+  useEffect(() => {
+    onInviteCountChange?.(pendingInviteCount)
+  }, [pendingInviteCount, onInviteCountChange])
 
   const e2eeNotice = e2ee.status === 'unavailable' ? e2ee.message : null
 
@@ -323,8 +336,8 @@ export function CommunityPanel(props: CommunityPanelProps) {
             <p className="flex items-start gap-2 rounded-xl border border-danger/30 bg-danger/5 px-3 py-2.5 text-[12px] leading-relaxed text-text2">
               <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-danger" aria-hidden />
               <span>
-                {e2eeNotice} You can still browse people and conversations, but sending is
-                disabled — Hodari never sends messages unencrypted.
+                {e2eeNotice} You can still browse. Sending stays off, Hodari never sends unencrypted
+                messages.
               </span>
             </p>
           )}
@@ -334,9 +347,35 @@ export function CommunityPanel(props: CommunityPanelProps) {
             </p>
           )}
 
+          {me && onOpenProfile && (
+            <button
+              type="button"
+              onClick={() => onOpenProfile(me.handle)}
+              className="flex w-full items-center gap-2.5 rounded-xl border border-border bg-surface px-3 py-2.5 text-left transition-colors hover:border-gold/40"
+            >
+              <EmojiAvatar emoji={me.avatar_emoji} name={me.name || `@${me.handle}`} size="md" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] font-medium text-text">
+                  {me.name || `@${me.handle}`}
+                </span>
+                <span className="block truncate font-mono text-[11px] text-text3">
+                  @{me.handle} · Edit
+                </span>
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-text3" aria-hidden />
+            </button>
+          )}
+
           <Tabs value={tab} onValueChange={(v) => setTab(v === 'chats' ? 'chats' : 'people')}>
             <TabsList>
-              <TabsTrigger value="people">People</TabsTrigger>
+              <TabsTrigger value="people">
+                <span className="relative inline-flex items-center gap-1.5">
+                  People
+                  {pendingInviteCount > 0 && (
+                    <span aria-label="Pending invites" role="img" className="h-1.5 w-1.5 rounded-full bg-gold" />
+                  )}
+                </span>
+              </TabsTrigger>
               <TabsTrigger value="chats">
                 <span className="relative inline-flex items-center gap-1.5">
                   Chats

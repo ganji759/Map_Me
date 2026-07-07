@@ -238,7 +238,7 @@ export function ConversationThread({
       appendRaw([msg])
       setInput('')
     } catch (err) {
-      setSendError(err instanceof CommunityApiError ? err.message : 'Could not send — try again.')
+      setSendError(err instanceof CommunityApiError ? err.message : 'Could not send. Try again.')
     } finally {
       setSending(false)
     }
@@ -254,7 +254,7 @@ export function ConversationThread({
         const bytes = await prepareImageForSending(file)
         const { ciphertext, iv } = await encryptBytes(key, bytes)
         if (ciphertext.length > MAX_CIPHERTEXT_B64) {
-          throw new Error('That image is too large to send encrypted — try a smaller one.')
+          throw new Error('Image too large. Try a smaller one.')
         }
         const msg = await sendMessage(convId, ciphertext, iv, 'image')
         pinnedRef.current = true
@@ -273,9 +273,9 @@ export function ConversationThread({
   const title = conversationTitle(conversation, currentUserId)
   const peerPresence = peer ? (presence[peer.user_id] ?? { online: false, last_seen_at: null }) : null
   const disabledNotice = !canCompose
-    ? (e2eeNotice ?? 'End-to-end encryption is unavailable on this device, so sending is disabled.')
+    ? (e2eeNotice ?? 'Encryption unavailable on this device. Sending is off.')
     : keyState === 'unavailable'
-      ? (keyError ?? 'Encrypted message — key unavailable on this device.')
+      ? (keyError ?? 'Key unavailable on this device.')
       : null
 
   return (
@@ -311,7 +311,7 @@ export function ConversationThread({
           </span>
         </span>
         <span
-          title="Messages are end-to-end encrypted"
+          title="End-to-end encrypted"
           className="inline-flex shrink-0 items-center gap-1 font-mono text-[9.5px] uppercase tracking-[0.14em] text-text3"
         >
           <Lock className="h-3 w-3" aria-hidden />
@@ -329,13 +329,13 @@ export function ConversationThread({
         {loadingInitial && view.length === 0 ? (
           <div className="flex items-center gap-2.5 py-3">
             <div className="thinking-ring" />
-            <span className="text-[11px] tracking-wide text-text2">Opening secure chat…</span>
+            <span className="text-[11px] tracking-wide text-text2">Opening chat…</span>
           </div>
         ) : view.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
             <Lock className="h-5 w-5 text-text3" aria-hidden />
             <p className="max-w-[240px] text-[12.5px] leading-relaxed text-text3">
-              This conversation is end-to-end encrypted. Say hello — only members&apos; devices can read it.
+              This chat is encrypted. Say hello.
             </p>
           </div>
         ) : (
@@ -381,7 +381,7 @@ export function ConversationThread({
                           >
                             <Lock className="h-3 w-3 shrink-0 text-text3" aria-hidden />
                             <span className="text-[12px] italic text-text3">
-                              Encrypted message — key unavailable on this device
+                              Key unavailable on this device
                             </span>
                           </div>
                         ) : m.msg_type === 'image' && m.imageUrl ? (
@@ -466,7 +466,7 @@ export function ConversationThread({
               disabled={!composerEnabled || sending}
               onClick={() => fileInputRef.current?.click()}
               aria-label="Attach a photo"
-              title="Attach a photo (encrypted)"
+              title="Attach photo"
               className={cn(
                 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-text3 transition-colors hover:bg-gold/10 hover:text-gold disabled:cursor-not-allowed disabled:opacity-40',
                 focusRing,
@@ -480,7 +480,7 @@ export function ConversationThread({
                 disabled={!composerEnabled || sending}
                 onClick={() => onSharePin(convId)}
                 aria-label="Share a place"
-                title="Share a saved place with this chat"
+                title="Share a place"
                 className={cn(
                   'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-text3 transition-colors hover:bg-gold/10 hover:text-gold disabled:cursor-not-allowed disabled:opacity-40',
                   focusRing,

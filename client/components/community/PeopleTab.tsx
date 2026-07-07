@@ -12,7 +12,7 @@
  * holds UI state and re-syncs via onChanged().
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2, MapPin, MessageSquare, Search, UserCheck, UserPlus, Users } from 'lucide-react'
+import { Loader2, MapPin, MessageSquare, Search, UserCheck, UserMinus, UserPlus, Users, X } from 'lucide-react'
 import { cn } from '@/lib/design/cn'
 import { focusRing } from '@/lib/design/tokens'
 import type { UserAttribution, UserSummary, PresenceInfo, RelationStatus } from '@/lib/community'
@@ -115,7 +115,7 @@ export function PeopleTab({
       if (searchGen.current !== gen) return
       setResults(users)
       if (users.length === 0) {
-        setSearchError('No travellers nearby — this needs location sharing on (yours and theirs).')
+        setSearchError('No travellers nearby. Turn on location sharing.')
       }
     } catch (err) {
       if (searchGen.current === gen) {
@@ -222,14 +222,14 @@ export function PeopleTab({
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Find travellers by handle or name…"
+            placeholder="Search by handle or name…"
             aria-label="Search travellers"
             className="min-w-0 flex-1 bg-transparent py-2.5 font-sans text-sm text-text outline-none placeholder:text-text3"
           />
           <button
             type="button"
             onClick={() => void runNearMe()}
-            title="Discoverable travellers within ~25km of your shared location"
+            title="Discoverable travellers within 25km"
             className={cn(
               'inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-border px-2.5 text-[11px] text-text2 transition-colors hover:border-gold/40 hover:text-gold',
               searchMode === 'near' && showResults && 'border-gold/40 text-gold',
@@ -358,7 +358,7 @@ export function PeopleTab({
           <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-4 py-6 text-center">
             <Users className="h-5 w-5 text-text3" aria-hidden />
             <p className="text-[12.5px] leading-relaxed text-text3">
-              No connections yet — search for fellow travellers above and send an invite.
+              No connections yet. Search above and invite someone.
             </p>
           </div>
         ) : (
@@ -367,7 +367,22 @@ export function PeopleTab({
               e.user ? (
                 <li key={e.user.user_id} className={ROW}>
                   {identity(e.user, null, presence[e.user.user_id] ?? { online: false, last_seen_at: null })}
-                  {messageButton(e.user)}
+                  <span className="flex shrink-0 items-center gap-1.5">
+                    {messageButton(e.user)}
+                    <button
+                      type="button"
+                      disabled={actingOn === e.user.user_id}
+                      onClick={() => void act('remove', e.user!.user_id)}
+                      aria-label={`Remove ${nameOf(e.user)}`}
+                      title="Remove connection"
+                      className={cn(
+                        'inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-text3 transition-colors hover:border-danger/50 hover:text-danger disabled:opacity-40',
+                        focusRing,
+                      )}
+                    >
+                      <UserMinus className="h-3.5 w-3.5" aria-hidden />
+                    </button>
+                  </span>
                 </li>
               ) : null,
             )}
@@ -384,8 +399,23 @@ export function PeopleTab({
               e.user ? (
                 <li key={e.user.user_id} className={cn(ROW, 'opacity-80')}>
                   {identity(e.user)}
-                  <span className="shrink-0 rounded-full border border-border px-2.5 py-1 text-[11px] text-text3">
-                    Pending
+                  <span className="flex shrink-0 items-center gap-1.5">
+                    <span className="rounded-full border border-border px-2.5 py-1 text-[11px] text-text3">
+                      Pending
+                    </span>
+                    <button
+                      type="button"
+                      disabled={actingOn === e.user.user_id}
+                      onClick={() => void act('cancel', e.user!.user_id)}
+                      aria-label={`Cancel invite to ${nameOf(e.user)}`}
+                      title="Cancel invite"
+                      className={cn(
+                        'inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-text3 transition-colors hover:border-danger/50 hover:text-danger disabled:opacity-40',
+                        focusRing,
+                      )}
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden />
+                    </button>
                   </span>
                 </li>
               ) : null,

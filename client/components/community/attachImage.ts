@@ -66,7 +66,7 @@ export async function prepareImageForSending(file: File): Promise<Uint8Array> {
         return new Uint8Array(await blob.arrayBuffer())
       }
     }
-    throw new Error('That image is too large to send encrypted — try a smaller one.')
+    throw new Error('Image too large. Try a smaller one.')
   } finally {
     URL.revokeObjectURL(url)
   }

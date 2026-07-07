@@ -60,7 +60,7 @@ export function ConversationList({
         <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-4 py-8 text-center">
           <MessageSquare className="h-5 w-5 text-text3" aria-hidden />
           <p className="max-w-[240px] text-[12.5px] leading-relaxed text-text3">
-            No chats yet — message a connection from the People tab, or start a group.
+            No chats yet. Message a connection, or start a group.
           </p>
         </div>
       ) : (

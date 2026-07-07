@@ -11,7 +11,7 @@ import {
 
 export const runtime = 'nodejs'
 
-const ACTIONS = ['invite', 'accept', 'decline', 'block'] as const
+const ACTIONS = ['invite', 'accept', 'decline', 'block', 'cancel', 'remove', 'unblock'] as const
 type Action = (typeof ACTIONS)[number]
 
 // GET /api/community/connections — the caller's edges, split into accepted +
@@ -77,6 +77,8 @@ export async function POST(req: NextRequest) {
         already_pending: 'Invite already sent.',
         blocked: 'This connection is unavailable.',
         no_pending: 'No pending invite from this user.',
+        no_connection: 'You are not connected.',
+        no_block: 'This user is not blocked.',
       }
       return NextResponse.json({ error: messages[result.reason] ?? 'Request failed.' }, { status: 409 })
     }

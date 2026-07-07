@@ -131,11 +131,11 @@ export function SharePinDialog({ place, conversationId, candidatePlaces = [], on
         ) : (
           <section aria-label="Pick a place">
             <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.14em] text-text3">
-              Pick a place to share
+              Pick a place
             </p>
             {candidates.length === 0 ? (
               <p className="text-[12.5px] leading-relaxed text-text3">
-                No places on your map yet — ask Hodari to find some, then share them here.
+                No places yet. Ask Hodari to find some first.
               </p>
             ) : (
               <ul className="flex max-h-64 flex-col gap-2 overflow-y-auto scrollbar-hide">
@@ -181,8 +181,7 @@ export function SharePinDialog({ place, conversationId, candidatePlaces = [], on
               </div>
             ) : connections.length === 0 ? (
               <p className="text-[12.5px] leading-relaxed text-text3">
-                No connections yet — open Community to find fellow travellers. The pin stays visible
-                only to you.
+                No connections yet. The pin stays private to you.
               </p>
             ) : (
               <>
@@ -216,7 +215,7 @@ export function SharePinDialog({ place, conversationId, candidatePlaces = [], on
                   })}
                 </ul>
                 <p className="mt-1.5 text-[11px] leading-relaxed text-text3">
-                  Optional — with no one selected the pin is saved just for you.
+                  Optional. Unselected pins stay private.
                 </p>
               </>
             )}

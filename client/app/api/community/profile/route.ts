@@ -85,7 +85,7 @@ export async function PUT(req: NextRequest) {
 
   if (body.handle !== undefined) {
     if (typeof body.handle !== 'string' || !HANDLE_RE.test(body.handle)) {
-      return NextResponse.json({ error: 'Handles are 3-24 characters: lowercase letters, digits, underscores.' }, { status: 400 })
+      return NextResponse.json({ error: '3-24 chars: lowercase, digits, underscore.' }, { status: 400 })
     }
     patch.handle = body.handle
   }
@@ -142,7 +142,7 @@ export async function PUT(req: NextRequest) {
     const result = await updateCommunityProfile(uid, patch)
     if (!result.ok) {
       if (result.reason === 'handle_taken') {
-        return NextResponse.json({ error: 'That handle is already taken.' }, { status: 409 })
+        return NextResponse.json({ error: 'Handle already taken.' }, { status: 409 })
       }
       return NextResponse.json({ error: 'Profile not found.' }, { status: 404 })
     }

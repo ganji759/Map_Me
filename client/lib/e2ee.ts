@@ -55,7 +55,7 @@ let cachedKeypair: StoredKeypair | null = null
 function subtle(): SubtleCrypto {
   if (typeof globalThis === 'undefined' || !globalThis.crypto?.subtle) throw new E2EEUnavailableError()
   if (typeof window !== 'undefined' && window.isSecureContext === false) {
-    throw new E2EEUnavailableError('End-to-end encryption needs HTTPS (or localhost) — this page is not a secure context.')
+    throw new E2EEUnavailableError('Encryption needs HTTPS or localhost. This page is not secure.')
   }
   return globalThis.crypto.subtle
 }
@@ -213,7 +213,7 @@ export async function createConversationKey(
 ): Promise<{ key: CryptoKey; wrappedKeys: Record<string, string> }> {
   const s = subtle()
   const me = await loadKeypair()
-  if (!me) throw new E2EEUnavailableError('No device key yet — call ensureKeypair() first.')
+  if (!me) throw new E2EEUnavailableError('No device key yet. Call ensureKeypair() first.')
 
   const convKey = await s.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt'])
   const raw = await s.exportKey('raw', convKey)
@@ -241,7 +241,7 @@ export async function unwrapConversationKey(wrapped: string, creatorPubJwk: Json
   const s = subtle()
   const me = await loadKeypair()
   if (!me) {
-    throw new E2EEUnavailableError('No device key on this device — history encrypted for another device cannot be read here.')
+    throw new E2EEUnavailableError('No device key here. History encrypted for another device can\'t be read here.')
   }
   const wrapKey = await deriveWrappingKey(me.privateKey, creatorPubJwk)
   const buf = fromB64(wrapped)

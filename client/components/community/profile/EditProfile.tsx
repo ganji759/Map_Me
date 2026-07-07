@@ -173,7 +173,7 @@ export function EditProfile({ initial, onSaved, onCancel }: EditProfileProps) {
       const h = handle.trim().toLowerCase()
       if (h !== profile.handle) {
         if (!HANDLE_RE.test(h)) {
-          setError('Handles are 3-24 characters: lowercase letters, digits, underscores.')
+          setError('3-24 chars: lowercase, digits, underscore.')
           setSaving(false)
           return
         }
@@ -190,7 +190,7 @@ export function EditProfile({ initial, onSaved, onCancel }: EditProfileProps) {
       const data = await res.json().catch(() => ({}))
       if (res.status === 409) {
         setHandleCheck('taken')
-        setError('That handle is already taken.')
+        setError('Handle already taken.')
         return
       }
       if (!res.ok) {
@@ -322,17 +322,17 @@ export function EditProfile({ initial, onSaved, onCancel }: EditProfileProps) {
           checked={discoverable}
           onChange={setDiscoverable}
           label="Discoverable"
-          hint="Other travellers can find you by handle and send you invites."
+          hint="Others can find and invite you."
         />
         <ToggleRow
           checked={shareLocation}
           onChange={onToggleShareLocation}
-          label="Show me on the map to my connections"
-          hint="Only people you've accepted see your approximate location. Turn it off anytime."
+          label="Share my location with connections"
+          hint="Only your connections see it. Turn off anytime."
         />
         <p className="rounded-xl border border-border bg-surface2/60 px-3.5 py-3 text-[11.5px] leading-relaxed text-text2">
-          Your chats are end-to-end encrypted on this device — Hodari&apos;s servers and the AI
-          can&apos;t read them. The AI only ever sees your bio, reviews, and shared pins.
+          Your chats are encrypted on this device. Hodari and the AI can&apos;t read them. The AI
+          only sees your bio, reviews, and pins.
         </p>
       </div>
 
@@ -349,7 +349,7 @@ export function EditProfile({ initial, onSaved, onCancel }: EditProfileProps) {
           )}
         >
           {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : saved ? <Check className="h-3.5 w-3.5" /> : null}
-          {saving ? 'Saving…' : saved ? 'Saved' : 'Save profile'}
+          {saving ? 'Saving…' : saved ? 'Saved' : 'Save'}
         </button>
         {onCancel && (
           <button
