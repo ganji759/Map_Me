@@ -5,6 +5,11 @@ import { motion, useReducedMotion } from 'framer-motion'
 import { Bookmark, ExternalLink, MapPin, Navigation, Star } from 'lucide-react'
 import type { Place } from '@/lib/types'
 import { PlaceImage } from './PlaceImage'
+import { DUR, EASE } from './ui/motion'
+
+/** Stagger cap — beyond this many cards, later items no longer lag further. */
+const STAGGER_CAP = 8
+const STAGGER_STEP = 0.04
 
 interface Props {
   places: Place[]
@@ -48,15 +53,21 @@ export function PlaceListPanel({ places, activeIndex, onSelect, onShowDetails, o
             return (
               <motion.li
                 key={`${place.place_id || place.name}-${i}`}
-                initial={reduced ? false : { opacity: 0, y: 10 }}
+                // Pins dropping onto the map: rise + fade, staggered 40ms apart,
+                // capped so a long results list doesn't leave late cards lagging.
+                initial={reduced ? false : { opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: reduced ? 0 : i * 0.04, duration: reduced ? 0 : 0.22 }}
+                transition={{
+                  delay: reduced ? 0 : Math.min(i, STAGGER_CAP) * STAGGER_STEP,
+                  duration: reduced ? 0 : DUR.base,
+                  ease: EASE,
+                }}
               >
                 <div
                   className={`w-full overflow-hidden rounded-2xl border text-left transition-all duration-200 motion-reduce:transition-none motion-reduce:transform-none ${
                     isActive
                       ? 'border-[#F56A00]/60 bg-[#F56A00]/[0.06] shadow-[0_6px_20px_rgba(245,106,0,0.16)] ring-1 ring-[#F56A00]/50 dark:bg-[#F56A00]/10'
-                      : 'border-border bg-surface shadow-[0_2px_12px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 hover:border-[#F56A00]/40 hover:shadow-[0_8px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_2px_12px_rgba(0,0,0,0.5)] dark:hover:shadow-[0_8px_24px_rgba(0,0,0,0.6)]'
+                      : 'border-border bg-surface shadow-[0_2px_12px_rgba(0,0,0,0.06)] [@media(hover:hover)]:hover:-translate-y-0.5 hover:border-[#F56A00]/40 hover:shadow-[0_8px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_2px_12px_rgba(0,0,0,0.5)] dark:hover:shadow-[0_8px_24px_rgba(0,0,0,0.6)]'
                   }`}
                 >
                   <button type="button" onClick={() => onSelect(i)} className="block w-full text-left">

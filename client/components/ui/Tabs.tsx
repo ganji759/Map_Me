@@ -1,9 +1,10 @@
 'use client'
 
 import { createContext, useContext, useId, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { cn } from '@/lib/design/cn'
 import { focusRing } from '@/lib/design/tokens'
+import { DUR, EASE } from './motion'
 
 interface TabsCtx {
   value: string
@@ -65,6 +66,7 @@ export function TabsList({ children, className }: { children: React.ReactNode; c
 export function TabsTrigger({ value, children, className }: { value: string; children: React.ReactNode; className?: string }) {
   const { value: active, setValue, baseId } = useTabs()
   const selected = active === value
+  const reduced = useReducedMotion()
   return (
     <button
       role="tab"
@@ -82,7 +84,15 @@ export function TabsTrigger({ value, children, className }: { value: string; chi
       )}
     >
       {children}
-      {selected && <motion.span layoutId={`${baseId}-underline`} className="absolute left-2 right-2 -bottom-px h-0.5 rounded-full bg-gold" />}
+      {selected && (
+        <motion.span
+          layoutId={`${baseId}-underline`}
+          className="absolute left-2 right-2 -bottom-px h-0.5 rounded-full bg-gold"
+          // Slides, doesn't jump — same calm glide as every other surface,
+          // not framer's default spring (which would read as a bouncy jump).
+          transition={reduced ? { duration: 0 } : { duration: DUR.base, ease: EASE }}
+        />
+      )}
     </button>
   )
 }

@@ -25,7 +25,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
         'rounded-2xl',
         glass ? 'glass' : 'bg-surface border border-border',
         interactive &&
-          'transition-all duration-200 hover:border-gold/40 hover:-translate-y-0.5 cursor-pointer motion-reduce:hover:translate-y-0',
+          'transition-all duration-[var(--dur-fast)] ease-[var(--ease-out-soft)] hover:border-gold/40 [@media(hover:hover)]:hover:-translate-y-0.5 cursor-pointer motion-reduce:hover:translate-y-0',
         PAD[padding],
         className,
       )}

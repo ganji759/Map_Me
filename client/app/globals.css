@@ -209,9 +209,25 @@ body::before {
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* ── Motion system ────────────────────────────────────────────────────────
+   Single source of truth for timing. Motion identity: "the map is the
+   protagonist; UI moves like cartography" — calm glide, no bounce, no
+   cartoon springs. Every keyframe/animation class below (and the framer-
+   motion variants in components/ui/motion.ts + lib/design/tokens.ts, which
+   mirror these values) resolves to one of these vars. Nothing animates that
+   doesn't communicate a state change.
+   ─────────────────────────────────────────────────────────────────────── */
+:root {
+  --ease-glide: cubic-bezier(0.22, 1, 0.36, 1); /* entrances/exits — the one "arriving" feel */
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1); /* hover/press micro-interactions — a softer stop */
+  --dur-fast: 150ms; /* press feedback, just-sent bubbles */
+  --dur-base: 250ms; /* default entrance — panels, cards, messages */
+  --dur-slow: 400ms; /* large/heavy surfaces only */
+}
+
 /* ── Motion keyframes ─────────────────────────────────────────────────────── */
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes fadeIn {
@@ -226,24 +242,22 @@ body::before {
   from { opacity: 0; transform: translateX(-16px); }
   to   { opacity: 1; transform: translateX(0); }
 }
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0; }
-}
 @keyframes waveBar {
   0%, 100% { transform: scaleY(0.4); }
   50%       { transform: scaleY(1); }
 }
-@keyframes history-drawer-in {
-  from { transform: translateX(-100%); }
-  to   { transform: translateX(0); }
+@keyframes route-draw {
+  0%   { transform: scaleX(0); opacity: 0.9; }
+  45%  { transform: scaleX(1); opacity: 1; }
+  65%  { transform: scaleX(1); opacity: 1; }
+  82%  { transform: scaleX(1); opacity: 0; }
+  83%  { transform: scaleX(0); opacity: 0; }
+  100% { transform: scaleX(0); opacity: 0.9; }
 }
-@keyframes gold-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 106, 0, 0); }
-  50%       { box-shadow: 0 0 0 6px rgba(245, 106, 0, 0.08); }
-}
-@keyframes orb-spin {
-  to { transform: rotate(360deg); }
+@keyframes presence-pulse {
+  0%   { transform: scale(0.6); box-shadow: 0 0 0 0 rgba(0, 196, 122, 0.5); }
+  60%  { transform: scale(1.25); box-shadow: 0 0 0 6px rgba(0, 196, 122, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 196, 122, 0); }
 }
 @keyframes scan {
   0%, 60%, 100% { opacity: 0.15; transform: translateY(0); }
@@ -270,37 +284,64 @@ body::before {
 }
 
 .animate-fade-up {
-  animation: fadeUp 0.25s ease-out both;
+  animation: fadeUp var(--dur-base) var(--ease-glide) both;
 }
 .animate-slide-right {
-  animation: slideInRight 0.25s ease-out both;
+  animation: slideInRight var(--dur-base) var(--ease-glide) both;
 }
 .animate-slide-left {
-  animation: slideInLeft 0.25s ease-out both;
+  animation: slideInLeft var(--dur-base) var(--ease-glide) both;
 }
-.animate-blink {
-  animation: blink 1s step-end infinite;
-}
-.animate-history-drawer-in {
-  animation: history-drawer-in 0.22s ease both;
-}
-.gold-ring {
-  animation: gold-pulse 2s ease-in-out infinite;
+/* Message-send motif: the just-sent bubble rises from the composer. Reuses
+   fadeUp's keyframe (translateY 8px reads as "~6px" at this small scale) but
+   at --dur-fast, since a chat bubble should feel instantaneous, not like a
+   heavier surface arriving. ChatPanel applies the same values via its own
+   framer-motion transition; this class covers the plain-CSS community
+   ConversationThread, whose messages are keyed by a stable seq so the
+   animation only ever fires on a genuinely new bubble's mount. */
+.animate-message-in {
+  animation: fadeUp var(--dur-fast) var(--ease-glide) both;
 }
 
 .ticket-perf {
   border-left: 2px dashed var(--border);
 }
 
+/* Route-draw motif: a thin gold line draws left-to-right like a route
+   polyline, reused everywhere a "thinking"/loading affordance is needed. */
 .thinking-ring {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(245, 106, 0, 0.18);
-  border-top-color: #F56A00;
-  border-right-color: rgba(245, 106, 0, 0.55);
-  animation: orb-spin 0.7s linear infinite;
+  position: relative;
+  width: 20px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(245, 106, 0, 0.16);
+  overflow: hidden;
   flex-shrink: 0;
+}
+.thinking-ring::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: #F56A00;
+  transform-origin: left center;
+  animation: route-draw 1.4s var(--ease-glide) infinite;
+}
+
+/* ── Micro-interactions ───────────────────────────────────────────────────
+   Shared press feedback so every button feels the same without hand-editing
+   each one. Apply `.btn-press` alongside a button's existing classes. */
+.btn-press {
+  transition: transform var(--dur-fast) var(--ease-out-soft);
+}
+.btn-press:active {
+  transform: scale(0.97);
+}
+
+/* Presence dot: one-shot pulse on the offline→online transition only (class
+   is added/removed by EmojiAvatar.tsx on the flip) — never a perpetual loop. */
+.animate-presence-pulse {
+  animation: presence-pulse var(--dur-slow) var(--ease-glide) 1 both;
 }
 
 .scan-dot:nth-child(1) { animation: scan 1.2s ease-in-out infinite 0ms; }
@@ -464,7 +505,8 @@ body::before {
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-up,
   .animate-slide-right,
-  .animate-slide-left {
+  .animate-slide-left,
+  .animate-message-in {
     animation: fadeIn 0.1s ease-out both;
   }
   .stream-caret,
@@ -472,14 +514,17 @@ body::before {
     animation: none;
   }
   .animate-pulse,
-  .thinking-ring,
+  .thinking-ring::after,
   .voice-orb-pulse,
   .voice-orb-pulse-2,
   .user-location-dot,
-  .gold-ring,
-  .animate-history-drawer-in,
+  .animate-presence-pulse,
   .hodari-glow-marker,
-  .hodari-glow-marker__ring {
+  .hodari-glow-marker__ring,
+  .scan-dot {
     animation: none !important;
+  }
+  .btn-press:active {
+    transform: none;
   }
 }

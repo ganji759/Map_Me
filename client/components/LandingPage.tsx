@@ -1624,8 +1624,13 @@ export default function LandingPage() {
       <Paywall gate={gate} onClose={() => setGate(null)} />
 
       {/* Dedicated voice UI: a floating orb with the LIVE transcript of what the
-          user is saying (browser STT streams interim words) + speak controls. */}
-      {uiMode === 'voice' && (
+          user is saying (browser STT streams interim words) + speak controls.
+          At the full sheet snap the sheet covers nearly the whole viewport
+          (only a 10px map sliver remains) — the floating orb would land on
+          top of the sheet's own content instead of beside it, so it hides
+          there. The composer's mic/Stop controls inside the sheet still work;
+          dragging the sheet back down to half restores the orb. */}
+      {uiMode === 'voice' && !(isMobile && chatSnap === 'full') && (
         <div className="fixed right-4 z-[130] bottom-[calc(env(safe-area-inset-bottom,0px)+10rem)] md:bottom-6 md:right-6">
           <VoiceOrb
             compact

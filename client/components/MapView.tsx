@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { APIProvider, Map, Map3D, Marker3D, MapMode, AltitudeMode, AdvancedMarker, InfoWindow, Pin, useMap, useMap3D, useMapsLibrary } from '@vis.gl/react-google-maps'
-import { AlertCircle, ChevronLeft, Compass, ExternalLink, Globe, Image as ImageIcon, Loader2, MapPin, Maximize2, Minimize2, Navigation, RotateCcw, RotateCw, Share2, Star, Users } from 'lucide-react'
+import { AlertCircle, ChevronLeft, Compass, Earth, ExternalLink, Globe, Image as ImageIcon, Loader2, Map as MapGlyph, MapPin, Maximize2, Minimize2, Navigation, Rotate3d, RotateCcw, RotateCw, Satellite, Share2, Star, Users } from 'lucide-react'
 import type { ItineraryStop, Place, Theme } from '@/lib/types'
 import type { CustomRouteConfig, MapAnnotations, TravelMode } from '@/lib/mapActions'
 import type { CommunityMapPin, CommunityFriend } from '@/components/community/useCommunityMapLayer'
@@ -14,6 +14,8 @@ import {
 } from '@/lib/geo'
 import { PlaceImage } from './PlaceImage'
 import { cinematicMapKeys } from '@/lib/animationMemory'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { focusRing } from '@/lib/design/tokens'
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ''
 const ROUTE_ORANGE = '#F56A00'
@@ -361,25 +363,39 @@ function MapZoomFocus({
 
 type MapDisplayMode = '3d' | 'map' | 'satellite' | 'realistic'
 
-const MAP_MODE_OPTIONS: { id: MapDisplayMode; label: string }[] = [
-  { id: '3d', label: '3D' },
-  { id: 'map', label: 'Map' },
-  { id: 'satellite', label: 'Satellite' },
+const MAP_MODE_OPTIONS: {
+  id: MapDisplayMode
+  label: string
+  icon: ComponentType<{ className?: string }>
+}[] = [
+  { id: '3d', label: '3D', icon: Rotate3d },
+  { id: 'map', label: 'Map', icon: MapGlyph },
+  { id: 'satellite', label: 'Satellite', icon: Satellite },
   // Photorealistic Google 3D (Map3DElement). Coverage is US-centric today —
   // which fits the 11 US World Cup host cities; elsewhere it shows a plain globe.
-  { id: 'realistic', label: 'Realistic' },
+  { id: 'realistic', label: 'Realistic', icon: Earth },
 ]
 
 function MapUiOptions({ fullControls }: { fullControls: boolean }) {
   const map = useMap()
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     if (!map || typeof google === 'undefined') return
     if (fullControls) {
       map.setOptions({
         zoomControl: true,
-        streetViewControl: true,
-        fullscreenControl: true,
+        // Phones: the chat bottom sheet covers the map's lower edge, so the
+        // default RIGHT_BOTTOM zoom stack hides behind the collapsed peek —
+        // pin it to RIGHT_TOP instead. Pegman drag and element fullscreen are
+        // desktop interactions; dropping them keeps the phone edge clear.
+        zoomControlOptions: {
+          position: isMobile
+            ? google.maps.ControlPosition.RIGHT_TOP
+            : google.maps.ControlPosition.RIGHT_BOTTOM,
+        },
+        streetViewControl: !isMobile,
+        fullscreenControl: !isMobile,
         mapTypeControl: false,
         // Custom rotate cluster replaces the native compass widget; vector
         // maps then rotate/tilt freely via Ctrl+drag (two fingers on touch).
@@ -398,7 +414,7 @@ function MapUiOptions({ fullControls }: { fullControls: boolean }) {
         tiltInteractionEnabled: false,
       })
     }
-  }, [map, fullControls])
+  }, [map, fullControls, isMobile])
 
   return null
 }
@@ -425,14 +441,20 @@ function MapModeControl({
               key={opt.id}
               type="button"
               aria-pressed={active}
+              aria-label={opt.label}
+              title={opt.label}
               onClick={() => onChange(opt.id)}
-              className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium tracking-tight transition-colors motion-reduce:transition-none ${
+              className={`flex items-center justify-center rounded-full text-[13px] font-medium tracking-tight transition-colors motion-reduce:transition-none max-sm:h-10 max-sm:w-10 sm:px-3.5 sm:py-1.5 ${focusRing} ${
                 active
                   ? 'bg-[#F56A00] text-white'
                   : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10'
               }`}
             >
-              {opt.label}
+              {/* Below sm the pill must fit 320px: icons only. Abbreviations
+                  ("Sat", "Real") are ambiguous and a scroll row hides modes,
+                  so each mode keeps a distinct glyph + title/aria label. */}
+              <opt.icon className="h-4 w-4 sm:hidden" aria-hidden />
+              <span className="hidden sm:inline">{opt.label}</span>
             </button>
           )
         })}
@@ -1238,7 +1260,7 @@ function CommunityLayerToggle({
       title={on ? 'Hide shared pins & connections' : 'Show shared pins & connections'}
       onClick={onToggle}
       className={`absolute z-[58] flex items-center justify-center rounded-full border shadow-md backdrop-blur transition-colors motion-reduce:transition-none ${
-        compact ? 'right-2 top-11 h-8 w-8' : 'right-4 top-20 h-10 w-10'
+        compact ? 'right-2 top-11 h-8 w-8' : 'right-4 top-20 h-10 w-10 max-md:top-36'
       } ${
         on
           ? 'border-[#2E7DF6]/60 bg-white/95 text-[#2E7DF6] dark:border-[#2E7DF6]/60 dark:bg-[#15151a]/95'

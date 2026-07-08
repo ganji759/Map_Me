@@ -347,7 +347,10 @@ export function ConversationThread({
               const sender = membersById[m.sender_id]
               const showSender = isGroup && !own && (!prev || prev.sender_id !== m.sender_id || newDay)
               return (
-                <div key={m.seq}>
+                // Keyed by the stable server seq, so this only mounts (and
+                // therefore only animates) once per message — never replays
+                // on a poll re-render of already-seen messages.
+                <div key={m.seq} className="animate-message-in">
                   {newDay && (
                     <div className="my-3 flex items-center gap-3">
                       <span className="h-px flex-1 bg-border" aria-hidden />
@@ -503,7 +506,7 @@ export function ConversationThread({
               disabled={!composerEnabled || sending || !input.trim()}
               aria-label="Send message"
               className={cn(
-                'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold text-white shadow-[0_2px_10px_rgba(245,106,0,0.35)] transition-all duration-150 hover:bg-brand-dark disabled:opacity-40 disabled:shadow-none',
+                'btn-press flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold text-white shadow-[0_2px_10px_rgba(245,106,0,0.35)] transition-colors duration-[var(--dur-fast)] hover:bg-brand-dark disabled:opacity-40 disabled:shadow-none',
                 focusRing,
               )}
             >

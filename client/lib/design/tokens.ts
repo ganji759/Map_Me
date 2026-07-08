@@ -76,10 +76,15 @@ export const z = {
   grain: 9999,
 } as const
 
-/** Motion — mirrors the CSS easings/durations already in globals.css. */
+/**
+ * Motion — mirrors the CSS vars defined in app/globals.css ("Motion system"
+ * section). Keep these two in sync by hand; there's no build step that reads
+ * the CSS custom properties into JS.
+ */
 export const motion = {
-  ease: [0.22, 1, 0.36, 1] as const, // cubic-bezier(0.22,1,0.36,1)
-  duration: { fast: 0.18, base: 0.3, slow: 0.45 },
+  ease: [0.22, 1, 0.36, 1] as const, // var(--ease-glide) — entrances/exits
+  easeOutSoft: [0.16, 1, 0.3, 1] as const, // var(--ease-out-soft) — hover/press
+  duration: { fast: 0.15, base: 0.25, slow: 0.4 }, // var(--dur-fast/base/slow), seconds
 } as const
 
 /**

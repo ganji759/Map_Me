@@ -5,9 +5,13 @@
  * soft-rounded tile (same treatment as ProfileSheet), with an optional
  * presence dot whose tooltip shows relative last-seen.
  */
+import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/design/cn'
 import type { PresenceInfo } from '@/lib/community'
 import { formatLastSeen } from '@/lib/communityClient'
+
+/** Matches --dur-slow in globals.css — the presence-pulse animation's length. */
+const PULSE_MS = 400
 
 type Size = 'sm' | 'md' | 'lg'
 
@@ -30,6 +34,22 @@ export interface EmojiAvatarProps {
 
 export function EmojiAvatar({ emoji, name, size = 'md', presence, className }: EmojiAvatarProps) {
   const online = presence?.online === true
+
+  // One-shot ring on the offline→online transition only — never a perpetual
+  // loop. wasOnline starts as the current value so mounting already-online
+  // never pulses; only a live flip does.
+  const wasOnline = useRef(online)
+  const [pulse, setPulse] = useState(false)
+  useEffect(() => {
+    if (online && !wasOnline.current) {
+      setPulse(true)
+      const t = setTimeout(() => setPulse(false), PULSE_MS)
+      wasOnline.current = online
+      return () => clearTimeout(t)
+    }
+    wasOnline.current = online
+  }, [online])
+
   return (
     <span className={cn('relative inline-flex shrink-0', className)}>
       <span
@@ -51,6 +71,7 @@ export function EmojiAvatar({ emoji, name, size = 'md', presence, className }: E
             'absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-surface',
             DOT[size],
             online ? 'bg-green' : 'bg-surface3',
+            pulse && 'animate-presence-pulse',
           )}
         />
       )}

@@ -297,7 +297,7 @@ export function ItineraryStack({ stops, activeIndex, onSelect, voiceSummary, onF
               onClick={() => handleCardClick(i)}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCardClick(i) } }}
               style={{ animationDelay: `${i * 70}ms` }}
-              className={`glass ${isActive ? 'glass-active' : ''} flex-shrink-0 w-64 rounded-2xl overflow-hidden text-left cursor-pointer transition-transform duration-300 hover:-translate-y-0.5 relative group animate-fade-up`}
+              className={`glass ${isActive ? 'glass-active' : ''} flex-shrink-0 w-64 rounded-2xl overflow-hidden text-left cursor-pointer transition-transform duration-300 [@media(hover:hover)]:hover:-translate-y-0.5 relative group animate-fade-up`}
             >
               {/* Background stop number watermark */}
               <span

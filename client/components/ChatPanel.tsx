@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   Bookmark,
   CalendarPlus,
+  Check,
   ChevronDown,
   History,
   LocateFixed,
@@ -13,8 +14,10 @@ import {
   MapPin,
   Menu,
   MessageSquare,
+  MessageSquarePlus,
   Mic,
   Moon,
+  MoreHorizontal,
   PanelLeftClose,
   PanelRightClose,
   Pencil,
@@ -29,13 +32,15 @@ import {
 import type { ChatMessage, Place, Theme } from '@/lib/types'
 import type { MapSnapshot } from '@/lib/mapHistory'
 import type { VoiceState } from '@/hooks/useVoice'
-import { ModelSwitcher, type ModelId } from './ModelSwitcher'
+import { ModelSwitcher, MODELS, type ModelId } from './ModelSwitcher'
 import { CollapsibleMessage } from './CollapsedReply'
 import { TypingIndicator, ThinkingTrace } from './TypingIndicator'
 import { OpenMapButton } from './OpenMapButton'
 import { InlinePlaceGallery } from './InlinePlaceGallery'
 import { googleCalendarUrl } from '@/lib/calendar'
 import { shownMessages } from '@/lib/animationMemory'
+import { focusRing } from '@/lib/design/tokens'
+import { DUR, EASE } from './ui/motion'
 
 interface Props {
   messages: ChatMessage[]
@@ -167,6 +172,12 @@ export function ChatPanel({
   const [hasNewBelow, setHasNewBelow] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyQuery, setHistoryQuery] = useState('')
+  // Below md the header has room for only a few icons — theme, speak-replies
+  // and the model switcher fold into this "More" popover so community,
+  // history and new-chat (the actions people reach for mid-conversation) keep
+  // a full 44px target instead of being squeezed to fit ~7 controls at once.
+  const [moreOpen, setMoreOpen] = useState(false)
+  const moreRef = useRef<HTMLDivElement>(null)
   const [caretVisible, setCaretVisible] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
@@ -250,6 +261,22 @@ export function ChatPanel({
   useEffect(() => {
     messages.forEach((m) => shownMessages.add(m.id))
   }, [messages])
+
+  useEffect(() => {
+    if (!moreOpen) return
+    function onClickOutside(e: MouseEvent) {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false)
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setMoreOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [moreOpen])
 
   // After the stream ends, the last reply keeps typing out for a beat. Keep the
   // view pinned to the bottom while it reveals — unless the user scrolled up.
@@ -433,7 +460,7 @@ export function ChatPanel({
               type="submit"
               disabled={loading}
               aria-label="Send message"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F56A00] text-white shadow-[0_2px_10px_rgba(245,106,0,0.35)] transition-all duration-150 hover:scale-105 hover:bg-[#e05a1a] active:scale-95 disabled:opacity-40 disabled:hover:scale-100 motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:scale-100 max-md:h-11 max-md:w-11"
+              className="btn-press flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F56A00] text-white shadow-[0_2px_10px_rgba(245,106,0,0.35)] transition-colors duration-[var(--dur-fast)] hover:bg-[#e05a1a] disabled:opacity-40 motion-reduce:transition-none max-md:h-11 max-md:w-11"
             >
               <Send className="h-4 w-4" />
             </button>
@@ -474,11 +501,14 @@ export function ChatPanel({
             {messages.map((msg, i) => (
             <motion.div
               key={msg.id}
-              initial={reduced || shownMessages.has(msg.id) ? false : { opacity: 0, y: 10 }}
+              // Just-sent bubble rises from the composer (fast + small offset);
+              // messages restored from history/streamed in glide like every
+              // other surface (base duration, slightly taller rise).
+              initial={reduced || shownMessages.has(msg.id) ? false : { opacity: 0, y: msg.role === 'user' ? 6 : 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{
-                duration: reduced ? 0 : 0.25,
-                ease: [0.22, 1, 0.36, 1],
+                duration: reduced ? 0 : msg.role === 'user' ? DUR.fast : DUR.base,
+                ease: EASE,
                 delay: reduced || i >= initialCountRef.current ? 0 : Math.min(i * 0.05, 0.4),
               }}
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -660,7 +690,7 @@ export function ChatPanel({
 
       <aside
         aria-hidden={!historyOpen}
-        className={`fixed left-0 top-0 z-50 flex h-full w-[240px] flex-col border-r border-[var(--border)] shadow-2xl transition-transform duration-[220ms] ease ${
+        className={`fixed left-0 top-0 z-50 flex h-full w-[240px] flex-col border-r border-[var(--border)] shadow-2xl transition-transform duration-[var(--dur-base)] ease-[var(--ease-glide)] ${
           historyOpen ? 'translate-x-0' : '-translate-x-full pointer-events-none'
         }`}
         style={{ backgroundColor: theme === 'dark' ? '#15151a' : '#ffffff' }}
@@ -791,13 +821,16 @@ export function ChatPanel({
             {modeToggle}
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {/* Below md: speak-replies, theme and the model switcher fold into
+                the "More" popover so the always-visible row (community,
+                new chat, history) keeps full 44px targets in ~360px. */}
             {speechOutSupported && onToggleSpeakReplies && (
               <button
                 type="button"
                 onClick={onToggleSpeakReplies}
                 aria-label={speakReplies ? 'Mute spoken replies' : 'Speak replies aloud'}
                 title={speakReplies ? 'Mute spoken replies' : 'Speak replies aloud'}
-                className={`rounded-lg border p-1.5 transition-colors max-md:p-2.5 ${speakReplies ? 'border-[#F56A00]/50 text-[#F56A00]' : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00]'}`}
+                className={`rounded-lg border p-1.5 transition-colors max-md:hidden ${speakReplies ? 'border-[#F56A00]/50 text-[#F56A00]' : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00]'}`}
               >
                 {speakReplies ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
               </button>
@@ -806,7 +839,7 @@ export function ChatPanel({
               type="button"
               onClick={onToggleTheme}
               aria-label="Toggle theme"
-              className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00] max-md:p-2.5"
+              className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00] max-md:hidden"
             >
               {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
@@ -820,7 +853,7 @@ export function ChatPanel({
                 }
                 title="Community"
                 onClick={onOpenCommunity}
-                className="relative rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00] max-md:p-2.5"
+                className={`relative rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00] max-md:flex max-md:h-11 max-md:w-11 max-md:items-center max-md:justify-center max-md:p-0 ${focusRing}`}
               >
                 <Users className="h-4 w-4" />
                 {!!communityInviteCount && (
@@ -833,11 +866,22 @@ export function ChatPanel({
                 )}
               </button>
             )}
+            {/* New chat: buried one level deep in the history drawer on
+                desktop, but promoted to a direct header action on phones. */}
+            <button
+              type="button"
+              aria-label="New chat"
+              title="New chat"
+              onClick={onNewChat}
+              className={`hidden rounded-lg border border-[var(--border)] text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00] max-md:flex max-md:h-11 max-md:w-11 max-md:items-center max-md:justify-center ${focusRing}`}
+            >
+              <MessageSquarePlus className="h-4 w-4" />
+            </button>
             <button
               type="button"
               aria-label="Open chat history"
               onClick={() => setHistoryOpen((open) => !open)}
-              className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00] max-md:p-2.5"
+              className={`rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] hover:border-[#F56A00]/40 hover:text-[#F56A00] max-md:flex max-md:h-11 max-md:w-11 max-md:items-center max-md:justify-center max-md:p-0 ${focusRing}`}
             >
               <Menu className="h-4 w-4" />
             </button>
@@ -855,7 +899,86 @@ export function ChatPanel({
                 {mapExpanded ? 'Compact map' : mapVisible ? 'Full map' : 'Open map'}
               </button>
             )}
-            <ModelSwitcher selected={selectedModel} onChange={onModelChange} />
+            <div className="max-md:hidden">
+              <ModelSwitcher selected={selectedModel} onChange={onModelChange} />
+            </div>
+            {/* More popover (below md only): theme, speak-replies, model. */}
+            <div ref={moreRef} className="relative hidden max-md:block">
+              <button
+                type="button"
+                aria-label="More options"
+                aria-haspopup="menu"
+                aria-expanded={moreOpen}
+                onClick={() => setMoreOpen((v) => !v)}
+                className={`flex h-11 w-11 items-center justify-center rounded-lg border text-[var(--text-secondary)] transition-colors ${moreOpen ? 'border-[#F56A00]/50 text-[#F56A00]' : 'border-[var(--border)] hover:border-[#F56A00]/40 hover:text-[#F56A00]'} ${focusRing}`}
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+              {moreOpen && (
+                <div
+                  role="menu"
+                  aria-label="More options"
+                  className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-header)] shadow-2xl"
+                >
+                  <div className="p-1.5">
+                    {speechOutSupported && onToggleSpeakReplies && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => { onToggleSpeakReplies(); setMoreOpen(false) }}
+                        aria-label={speakReplies ? 'Mute spoken replies' : 'Speak replies aloud'}
+                        className={`flex min-h-[40px] w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-[var(--text-primary)] transition-colors hover:bg-[#F56A00]/[0.06] ${focusRing}`}
+                      >
+                        {speakReplies ? <Volume2 className="h-4 w-4 shrink-0" /> : <VolumeX className="h-4 w-4 shrink-0" />}
+                        {speakReplies ? 'Mute spoken replies' : 'Speak replies aloud'}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => { onToggleTheme(); setMoreOpen(false) }}
+                      aria-label="Toggle theme"
+                      className={`flex min-h-[40px] w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] text-[var(--text-primary)] transition-colors hover:bg-[#F56A00]/[0.06] ${focusRing}`}
+                    >
+                      {theme === 'dark' ? <Sun className="h-4 w-4 shrink-0" /> : <Moon className="h-4 w-4 shrink-0" />}
+                      {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+                    </button>
+                  </div>
+                  <div className="border-t border-[var(--border)] p-1.5">
+                    <p className="px-3 pb-1 pt-0.5 font-mono text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">
+                      AI Model
+                    </p>
+                    {MODELS.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={m.id === selectedModel}
+                        disabled={!m.available}
+                        onClick={() => { if (m.available) { onModelChange(m.id); setMoreOpen(false) } }}
+                        className={`flex min-h-[40px] w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] transition-colors ${
+                          m.id === selectedModel
+                            ? 'bg-[#F56A00]/10 text-[var(--text-primary)]'
+                            : m.available
+                              ? 'text-[var(--text-primary)] hover:bg-[#F56A00]/[0.06]'
+                              : 'cursor-not-allowed text-[var(--text-secondary)] opacity-40'
+                        } ${focusRing}`}
+                      >
+                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${m.dot}`} />
+                        <span className="min-w-0 flex-1 truncate">{m.name}</span>
+                        {m.id === selectedModel ? (
+                          <Check className="h-3.5 w-3.5 shrink-0 text-[#F56A00]" />
+                        ) : !m.available ? (
+                          <span className="shrink-0 rounded border border-[var(--border)] px-1.5 py-0.5 font-mono text-[9px] text-[var(--text-secondary)]">
+                            Soon
+                          </span>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             {onCollapse && (
               <button type="button" onClick={onCollapse} aria-label="Collapse chat" className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-secondary)] max-md:p-2.5">
                 <PanelLeftClose className="h-4 w-4" />

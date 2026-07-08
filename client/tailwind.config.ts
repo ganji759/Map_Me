@@ -44,25 +44,9 @@ const config: Config = {
         mono:    ['"DM Mono"', 'Menlo', 'monospace'],
         sans:    ['Outfit', 'system-ui', 'sans-serif'],
       },
-      keyframes: {
-        'slide-in-right': {
-          from: { transform: 'translateX(100%)', opacity: '0' },
-          to:   { transform: 'translateX(0)',    opacity: '1' },
-        },
-        'fade-up': {
-          from: { transform: 'translateY(8px)', opacity: '0' },
-          to:   { transform: 'translateY(0)',   opacity: '1' },
-        },
-        pulse_dot: {
-          '0%, 80%, 100%': { opacity: '0.2', transform: 'scale(0.8)' },
-          '40%':            { opacity: '1',   transform: 'scale(1)' },
-        },
-      },
-      animation: {
-        'slide-in-right': 'slide-in-right 0.45s cubic-bezier(0.22,1,0.36,1) forwards',
-        'fade-up':        'fade-up 0.4s ease forwards',
-        pulse_dot:        'pulse_dot 1.4s ease-in-out infinite',
-      },
+      // Entrance/loop animation classes live in app/globals.css (single source —
+      // see the "Motion system" section there). This file previously duplicated
+      // slide-in-right / fade-up / pulse_dot as unused near-duplicates; removed.
     },
   },
   plugins: [],

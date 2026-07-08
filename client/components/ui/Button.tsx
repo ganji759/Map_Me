@@ -52,7 +52,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       aria-busy={loading || undefined}
       className={cn(
         'inline-flex items-center justify-center font-sans font-medium select-none',
-        'transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed',
+        'btn-press transition-colors duration-[var(--dur-fast)] disabled:opacity-40 disabled:cursor-not-allowed',
         pill ? 'rounded-full' : 'rounded-xl',
         SIZES[size],
         iconOnly ? ICON_PAD[size] : PAD[size],
