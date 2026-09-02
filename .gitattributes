@@ -1,0 +1,21 @@
+# Normalize line endings. Git stores LF, checks out native on Windows.
+* text=auto
+
+# Force LF for files that break with CRLF
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.py        text eol=lf
+
+# Binary assets
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.mp4  binary
+*.pdf  binary
+*.ico  binary
+*.woff  binary
+*.woff2 binary
+
+# Keep generated lockfiles out of diffs and language stats
+package-lock.json linguist-generated=true -diff
