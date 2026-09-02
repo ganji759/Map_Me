@@ -40,7 +40,7 @@ Examples of good subtasks:
 """
 
 planner_agent = LlmAgent(
-    model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+    model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
     name="planner_agent",
     description="Parses user intent into a structured Plan with goal, constraints, and subtasks. No external tools.",
     instruction=PLANNER_INSTRUCTION,

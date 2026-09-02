@@ -399,7 +399,7 @@ Keep answers concise — users are on mobile near a stadium.
 """
 
     return LlmAgent(
-        model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+        model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
         name="hodari",
         description="Hodari — tourist AI assistant for the 2026 FIFA World Cup (remote pipeline)",
         instruction=REMOTE_ORCHESTRATOR_INSTRUCTION,

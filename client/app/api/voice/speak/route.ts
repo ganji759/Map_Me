@@ -7,7 +7,7 @@ import { genai, genaiConfigured, genaiMissingHint } from '@/lib/genaiServer'
 // so the browser can play it directly. Credentials stay server-side.
 export const runtime = 'nodejs'
 
-const TTS_MODEL = process.env.GEMINI_TTS_MODEL ?? 'gemini-2.5-flash-preview-tts'
+const TTS_MODEL = process.env.GEMINI_TTS_MODEL ?? 'gemini-3.1-flash-tts-preview'
 const TTS_VOICE = process.env.GEMINI_TTS_VOICE ?? 'Kore'
 
 function rateFromMime(mime?: string): number {

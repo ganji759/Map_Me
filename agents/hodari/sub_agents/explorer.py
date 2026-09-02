@@ -72,7 +72,7 @@ Return ONLY a valid JSON array — no markdown fences, no commentary:
 """
 
 explorer_agent = LlmAgent(
-    model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+    model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
     name="explorer_agent",
     description="Finds 5-10 personalised candidate places via local vector DB + Maps + past user preferences.",
     instruction=EXPLORER_INSTRUCTION,

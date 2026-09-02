@@ -6,7 +6,7 @@ import { genai, genaiConfigured, genaiMissingHint } from '@/lib/genaiServer'
 // transcript. Credentials stay server-side, never shipped to the browser.
 export const runtime = 'nodejs'
 
-const STT_MODEL = process.env.GEMINI_STT_MODEL ?? 'gemini-2.5-flash'
+const STT_MODEL = process.env.GEMINI_STT_MODEL ?? 'gemini-3.5-flash'
 
 export async function POST(req: NextRequest) {
   if (!genaiConfigured()) {

@@ -53,7 +53,7 @@ Return ONLY this compact JSON (no markdown, no extra keys):
 """
 
 itinerary_agent = LlmAgent(
-    model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+    model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
     name="itinerary_agent",
     description="Builds a weather-aware 2-3 stop itinerary from candidate places.",
     instruction=ITINERARY_INSTRUCTION,

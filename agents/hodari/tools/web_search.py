@@ -34,7 +34,7 @@ Rules:
 
 def create_web_search_tool() -> GoogleSearchAgentTool:
     """Build the web_search AgentTool the orchestrator can call."""
-    model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
     search_agent = LlmAgent(
         name="web_search",
         model=model,

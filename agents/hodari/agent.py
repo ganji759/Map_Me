@@ -393,7 +393,7 @@ if community_mcp_enabled():
         print(f"[hodari] community MCP disabled (toolset init failed): {exc}")
 
 root_agent = LlmAgent(
-    model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+    model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
     name="hodari",
     description="Hodari — tourist AI assistant for the 2026 FIFA World Cup",
     instruction=_instruction,
