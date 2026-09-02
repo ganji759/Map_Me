@@ -303,7 +303,7 @@ export default function SavedPage() {
                 <Calendar className="mx-auto mb-4 h-10 w-10 text-amber-300" />
                 <p className="text-[15px] font-medium text-amber-800 dark:text-amber-200">No visits planned yet</p>
                 <p className="mt-1.5 text-[13px] text-amber-600/70 dark:text-amber-500/70">
-                  Go to Places and tap "Plan visit" on a saved place to add it here.
+                  Go to Places and tap &ldquo;Plan visit&rdquo; on a saved place to add it here.
                 </p>
                 <button onClick={() => setTab('places')} className="mt-4 inline-block rounded-full bg-amber-600 px-6 py-2 text-[13px] font-medium text-white transition-colors hover:bg-amber-700">
                   View saved places
