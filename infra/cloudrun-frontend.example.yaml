@@ -12,10 +12,10 @@ spec:
         autoscaling.knative.dev/maxScale: "3"
         run.googleapis.com/execution-environment: gen2
     spec:
-      serviceAccountName: hodari-agent@mapsme-498314.iam.gserviceaccount.com
+      serviceAccountName: hodari-agent@YOUR_GCP_PROJECT_ID.iam.gserviceaccount.com
       containers:
       - name: hodari-frontend
-        image: us-central1-docker.pkg.dev/mapsme-498314/hodari/frontend@sha256:465df4f306eb17d5820b3adc20d0c6b384b0c152d10209ba769e90a234827477
+        image: us-central1-docker.pkg.dev/YOUR_GCP_PROJECT_ID/hodari/frontend@sha256:REPLACE_WITH_YOUR_IMAGE_DIGEST
         ports:
         - containerPort: 3000
         resources:
@@ -24,13 +24,13 @@ spec:
             cpu: "1"
         env:
         - name: ADK_BASE_URL
-          value: https://hodari-agent-377773225771.us-central1.run.app
+          value: https://hodari-agent-YOUR_PROJECT_NUMBER.us-central1.run.app
         - name: ADK_APP_NAME
           value: hodari
         - name: GOOGLE_GENAI_USE_VERTEXAI
           value: "TRUE"
         - name: GOOGLE_CLOUD_PROJECT
-          value: mapsme-498314
+          value: YOUR_GCP_PROJECT_ID
         - name: GEMINI_VOICE_LOCATION
           value: us-central1
         # Dedicated, API-restricted server key (Routes + Places + photos) — split
@@ -71,15 +71,15 @@ spec:
         # Pins the OAuth redirect URI so it always matches what's registered in
         # the Google OAuth client (avoids redirect_uri mismatch across URLs).
         - name: PUBLIC_BASE_URL
-          value: https://hodari-frontend-377773225771.us-central1.run.app
+          value: https://hodari-frontend-YOUR_PROJECT_NUMBER.us-central1.run.app
         # Audience for the Google ID token the frontend mints to call the agent
         # service (so the agent can drop allUsers and accept only this SA).
         # See BILLING.md → "Lock the agent endpoint".
         - name: AGENT_AUDIENCE
-          value: https://hodari-agent-377773225771.us-central1.run.app
+          value: https://hodari-agent-YOUR_PROJECT_NUMBER.us-central1.run.app
         # Owner/staff accounts that bypass usage metering (comma-separated emails).
         - name: HODARI_UNLIMITED_EMAILS
-          value: pacymugisho@gmail.com
+          value: you@example.com
         # ── Billing (Stripe) ─────────────────────────────────────────────────
         # Stripe Price ids per credit pack (NOT secret — safe as plain values).
         - name: STRIPE_PRICE_STARTER
@@ -103,7 +103,7 @@ spec:
 
       # ── MongoDB MCP sidecar (for login route) ─────────────────────────────
       - name: mongodb-mcp
-        image: us-central1-docker.pkg.dev/mapsme-498314/hodari/mongodb-mcp@sha256:570008ed262c84c2d180195ad74b1971fe39314a65a4b949057e8c59527390bd
+        image: us-central1-docker.pkg.dev/YOUR_GCP_PROJECT_ID/hodari/mongodb-mcp@sha256:REPLACE_WITH_YOUR_IMAGE_DIGEST
         resources:
           limits:
             memory: 256Mi

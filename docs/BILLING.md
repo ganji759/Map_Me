@@ -74,13 +74,13 @@ throws `ChatGateError`.
    Copy its signing secret (`whsec_…`).
 4. **Store secrets** in Secret Manager:
    ```bash
-   printf '%s' 'sk_live_…'  | gcloud secrets create STRIPE_SECRET_KEY     --data-file=- --project mapsme-498314
-   printf '%s' 'whsec_…'    | gcloud secrets create STRIPE_WEBHOOK_SECRET --data-file=- --project mapsme-498314
+   printf '%s' 'sk_live_…'  | gcloud secrets create STRIPE_SECRET_KEY     --data-file=- --project YOUR_GCP_PROJECT_ID
+   printf '%s' 'whsec_…'    | gcloud secrets create STRIPE_WEBHOOK_SECRET --data-file=- --project YOUR_GCP_PROJECT_ID
    # grant the runtime SA read access
    for S in STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET; do
      gcloud secrets add-iam-policy-binding $S \
-       --member=serviceAccount:hodari-agent@mapsme-498314.iam.gserviceaccount.com \
-       --role=roles/secretmanager.secretAccessor --project mapsme-498314
+       --member=serviceAccount:hodari-agent@YOUR_GCP_PROJECT_ID.iam.gserviceaccount.com \
+       --role=roles/secretmanager.secretAccessor --project YOUR_GCP_PROJECT_ID
    done
    ```
 5. **Edit `infra/cloudrun-frontend.yaml`:** put the real `price_…` ids into
@@ -88,9 +88,9 @@ throws `ChatGateError`.
    `STRIPE_WEBHOOK_SECRET` blocks.
 6. **Deploy** (same flow as always):
    ```bash
-   gcloud builds submit --config client/cloudbuild.yaml --project mapsme-498314 client/
+   gcloud builds submit --config client/cloudbuild.yaml --project YOUR_GCP_PROJECT_ID client/
    # bump the image digest in infra/cloudrun-frontend.yaml, then:
-   gcloud run services replace infra/cloudrun-frontend.yaml --region us-central1 --project mapsme-498314
+   gcloud run services replace infra/cloudrun-frontend.yaml --region us-central1 --project YOUR_GCP_PROJECT_ID
    ```
 
 Until step 5, the free tier works and the paywall politely says payments aren't
@@ -101,7 +101,7 @@ enabled yet.
 ## Lock the agent endpoint (P0.3 — ✅ SHIPPED 2026-07-03)
 
 > **Status: done.** `hodari-agent` no longer accepts `allUsers`; invoker is
-> restricted to `hodari-agent@mapsme-498314.iam.gserviceaccount.com` (the
+> restricted to `hodari-agent@YOUR_GCP_PROJECT_ID.iam.gserviceaccount.com` (the
 > frontend's SA). Verified 2026-07-03: anonymous `GET /` and `POST /run_sse`
 > both return **403**, while a guest chat through `/api/chat` still streams.
 > The steps below are kept for reference / rollback.
@@ -111,7 +111,7 @@ anyone can `curl` the agent URL directly and skip the paywall. The frontend now
 mints a Google ID token (`lib/gcpAuth.ts`) and sends it on every agent call, so
 you can lock the agent to the frontend's service account.
 
-**Both services already run as `hodari-agent@mapsme-498314.iam.gserviceaccount.com`**,
+**Both services already run as `hodari-agent@YOUR_GCP_PROJECT_ID.iam.gserviceaccount.com`**,
 so grant that SA invoker and drop public access. Do it in this order (no downtime):
 
 ```bash
@@ -120,17 +120,17 @@ so grant that SA invoker and drop public access. Do it in this order (no downtim
 
 # 2. Allow the frontend SA to invoke the agent:
 gcloud run services add-iam-policy-binding hodari-agent \
-  --member=serviceAccount:hodari-agent@mapsme-498314.iam.gserviceaccount.com \
-  --role=roles/run.invoker --region us-central1 --project mapsme-498314
+  --member=serviceAccount:hodari-agent@YOUR_GCP_PROJECT_ID.iam.gserviceaccount.com \
+  --role=roles/run.invoker --region us-central1 --project YOUR_GCP_PROJECT_ID
 
 # 3. Remove public access:
 gcloud run services remove-iam-policy-binding hodari-agent \
   --member=allUsers --role=roles/run.invoker \
-  --region us-central1 --project mapsme-498314
+  --region us-central1 --project YOUR_GCP_PROJECT_ID
 
 # 4. (optional, stronger) restrict ingress to internal + load balancer:
 # gcloud run services update hodari-agent --ingress internal-and-cloud-load-balancing \
-#   --region us-central1 --project mapsme-498314
+#   --region us-central1 --project YOUR_GCP_PROJECT_ID
 ```
 
 Test a chat after step 3. If it 403s, the token audience is wrong — `AGENT_AUDIENCE`

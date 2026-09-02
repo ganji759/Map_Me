@@ -1,51 +1,75 @@
-# Screenshots from Playwright testing
+# ── Secrets and local config ──────────────────────────────────────────────────
+# Never commit real credentials. Copy the .example files instead.
+.env
+.env.*
+!.env.example
+!*.env.example
+!.env.local.example
+!*.env.local.example
+client/.env.local
+client/.env*.local
+agents/.env
+
+# Real Cloud Run service configs hold your project id and image digests.
+# Copy infra/cloudrun-*.example.yaml to the same name without ".example".
+infra/cloudrun-agent.yaml
+infra/cloudrun-frontend.yaml
+
+# Service account keys
+*.pem
+*.p12
+*-service-account*.json
+gha-creds-*.json
+
+# ── Dependencies and build output ─────────────────────────────────────────────
+node_modules/
+.next/
+out/
+dist/
+build/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# ── Test and dev artefacts ────────────────────────────────────────────────────
+# Screenshots from Playwright runs
 *.png
 *.jpg
 *.jpeg
 image*
-
 # ...but shipped site assets are not screenshots
 !client/public/**/*.png
 !client/public/**/*.jpg
 !client/public/**/*.jpeg
+!client/public/**/*.svg
+!docs/**/*.png
 
-# Dependencies
-node_modules/
-
-# Local Claude Code settings
-.claude/
-
-# Local artefacts
-error01
-video_demo
-agents/hodari_probe_*.json
-
-# Playwright MCP artefacts
 .playwright-mcp/
+.demo_frames/
+playwright-report/
+test-results/
+coverage/
+.pytest_cache/
+video_demo
 
-# Temp logs
-C:/Temp/
+# ── ADK runtime artefacts and logs ────────────────────────────────────────────
+agents/.adk/
+agents/hodari/.adk/
+agents/hodari_probe_*.json
+agents/mcp-*.txt
+*.log
+*.log.*
+*.err
 
-# OS
+# ── Editor and OS ─────────────────────────────────────────────────────────────
+.claude/
+.idea/
+.vscode/
 .DS_Store
 Thumbs.db
 
-# ADK artefacts & logs
-agents/.adk/
-agents/hodari/.adk/
-agents/*.log
-agents/*.log.*
-agents/*.err
-agents/mcp-*.txt
-
-# Python (root-level, sub-dirs have their own .gitignore)
-__pycache__/
-*.pyc
-*.pyo
-.venv/
-.env
-
-client/.env.local
-client/.env.local.example
-
+# ── Misc ──────────────────────────────────────────────────────────────────────
 True Backend/
+error01

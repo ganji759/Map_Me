@@ -1,0 +1,22 @@
+Hodari
+Copyright 2026 Pacifique Mugisho
+
+This product includes software developed by the Hodari contributors.
+
+Licensed under the Apache License, Version 2.0. See the LICENSE file.
+
+---
+
+Third-party services
+
+Hodari calls the following external services at runtime. Each is governed by
+its own terms, and this license does not grant any right to use them:
+
+  - Google Maps Platform (Maps Grounding Lite MCP, Maps JavaScript API,
+    Places API) - https://cloud.google.com/maps-platform/terms
+  - Google Vertex AI / Gemini - https://cloud.google.com/terms/service-terms
+  - MongoDB Atlas - https://www.mongodb.com/legal/terms-of-use
+  - Stripe - https://stripe.com/legal
+
+"Hodari" and the Hodari logo are not licensed for use by third parties.
+See Section 6 of the LICENSE.

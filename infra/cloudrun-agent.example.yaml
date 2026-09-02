@@ -15,11 +15,11 @@ spec:
         # GOOGLE_MAPS_API_KEY secret (Maps key split for least privilege).
         hodari.dev/key-rotation: "2026-06-15-keysplit"
     spec:
-      serviceAccountName: hodari-agent@mapsme-498314.iam.gserviceaccount.com
+      serviceAccountName: hodari-agent@YOUR_GCP_PROJECT_ID.iam.gserviceaccount.com
       containers:
       # ── Main serving container ────────────────────────────────────────────
       - name: hodari-agent
-        image: us-central1-docker.pkg.dev/mapsme-498314/hodari/agent@sha256:22d1d8ca9c7a3fece8522d9374293609811e472988cd9d276ab42a8958a294db
+        image: us-central1-docker.pkg.dev/YOUR_GCP_PROJECT_ID/hodari/agent@sha256:REPLACE_WITH_YOUR_IMAGE_DIGEST
         ports:
         - containerPort: 8080
         resources:
@@ -32,7 +32,7 @@ spec:
         - name: GOOGLE_GENAI_USE_VERTEXAI
           value: "TRUE"
         - name: GOOGLE_CLOUD_PROJECT
-          value: mapsme-498314
+          value: YOUR_GCP_PROJECT_ID
         - name: GOOGLE_CLOUD_LOCATION
           value: global
         - name: GEMINI_MODEL
@@ -69,7 +69,7 @@ spec:
 
       # ── MongoDB MCP sidecar (localhost:3100) ──────────────────────────────
       - name: mongodb-mcp
-        image: us-central1-docker.pkg.dev/mapsme-498314/hodari/mongodb-mcp@sha256:570008ed262c84c2d180195ad74b1971fe39314a65a4b949057e8c59527390bd
+        image: us-central1-docker.pkg.dev/YOUR_GCP_PROJECT_ID/hodari/mongodb-mcp@sha256:REPLACE_WITH_YOUR_IMAGE_DIGEST
         resources:
           limits:
             memory: 256Mi
@@ -86,7 +86,7 @@ spec:
       # shared network namespace, same as mongodb-mcp above. Read-only;
       # structurally cannot read `messages`/`conversations` (see server.py).
       - name: community-mcp
-        image: us-central1-docker.pkg.dev/mapsme-498314/hodari/community-mcp@sha256:02af8ce556d43325e116530a384cc62ee2ffe7815e6a14357977510714d03d42
+        image: us-central1-docker.pkg.dev/YOUR_GCP_PROJECT_ID/hodari/community-mcp@sha256:REPLACE_WITH_YOUR_IMAGE_DIGEST
         resources:
           limits:
             memory: 256Mi

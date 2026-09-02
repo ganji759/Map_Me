@@ -1,5 +1,9 @@
 # Hodari
 
+[![CI](https://github.com/ganji759/Map_Me/actions/workflows/ci.yml/badge.svg)](https://github.com/ganji759/Map_Me/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
+
 **A multi-agent tourist AI assistant for the 2026 FIFA World Cup.** Hodari helps football fans plan grounded, personalized itineraries through a conversational interface backed by real Google Maps data, and renders them on an interactive map with walking/driving routes.
 
 > Hodari (Swahili: *brave / capable*) turns a fan's free time between matches into a concrete plan: where to eat, what to see, and how to get there.
@@ -144,10 +148,23 @@ Map_Me/
 │   ├── Dockerfile
 │   └── cloudbuild.yaml         # builds frontend image via Cloud Build
 ├── infra/
-│   ├── cloudrun-agent.yaml     # Cloud Run service definition (agent + MCP sidecar)
-│   ├── cloudrun-frontend.yaml  # Cloud Run service definition (frontend + MCP sidecar)
-│   └── mongodb-mcp/Dockerfile  # pre-installs mongodb-mcp-server
-├── Hodari_System_Architecture.md
+│   ├── cloudrun-agent.example.yaml     # template: agent + MCP sidecar
+│   ├── cloudrun-frontend.example.yaml  # template: frontend + MCP sidecar
+│   ├── mongodb-mcp/Dockerfile          # pre-installs mongodb-mcp-server
+│   └── README.md                       # how to fill in the templates
+├── docs/
+│   ├── Hodari_System_Architecture.md   # the design reference
+│   ├── SECURITY_HARDENING.md           # deployment hardening checklist
+│   ├── BILLING.md                      # usage metering and Stripe credit packs
+│   ├── PERFORMANCE_OPTIMIZATION_PLAN.md
+│   ├── CAPABILITIES_ROADMAP.md
+│   ├── FEATURE_EXPANSION_ROADMAP.md
+│   └── UI_OVERHAUL_SPRINT.md
+├── .github/                    # CI, issue templates, pull request template
+├── CONTRIBUTING.md
+├── SECURITY.md
+├── CODE_OF_CONDUCT.md
+├── LICENSE
 └── CLAUDE.md
 ```
 
@@ -256,11 +273,17 @@ gcloud builds submit --config client/cloudbuild.yaml --project <PROJECT_ID> clie
 # Build agent
 gcloud builds submit --config agents/cloudbuild.yaml --project <PROJECT_ID> agents/
 
+# First time only: copy the templates and fill in your project id.
+#   cp infra/cloudrun-agent.example.yaml    infra/cloudrun-agent.yaml
+#   cp infra/cloudrun-frontend.example.yaml infra/cloudrun-frontend.yaml
+# Your real copies stay out of git. See infra/README.md.
+
 # After each build, pin the new digest in infra/cloudrun-*.yaml then:
 gcloud run services replace infra/cloudrun-frontend.yaml --region us-central1 --project <PROJECT_ID>
 gcloud run services replace infra/cloudrun-agent.yaml   --region us-central1 --project <PROJECT_ID>
 
-# Make services public (first deploy only)
+# Make the frontend public (first deploy only).
+# Do NOT make the agent public in production. See docs/SECURITY_HARDENING.md.
 gcloud run services add-iam-policy-binding hodari-frontend --member="allUsers" --role="roles/run.invoker" --region us-central1
 gcloud run services add-iam-policy-binding hodari-agent   --member="allUsers" --role="roles/run.invoker" --region us-central1
 ```
@@ -284,10 +307,39 @@ Booking/payments, email notifications, calendar sync, OAuth, and multilingual su
 
 ---
 
-## Copyright
+## Contributing
 
-Copyright © 2026 Pacifique Mugisho. All Rights Reserved.
+Contributions are welcome. Read [CONTRIBUTING.md](./CONTRIBUTING.md) for the
+setup, the code style, and the pull request process. Everyone who takes part
+must follow the [Code of Conduct](./CODE_OF_CONDUCT.md).
 
-This is proprietary and confidential software. No part of it may be copied,
-used, modified, distributed, or reverse-engineered without the prior written
-permission of the owner. See [LICENSE](./LICENSE) for the full terms.
+Good places to start:
+
+- Issues labelled `good first issue`.
+- Documentation fixes. These need no prior issue.
+- New Explorer tools. Add a tool to an existing agent. Do not add a fifth agent.
+
+---
+
+## Security
+
+Do not report a security problem in a public issue. Read
+[SECURITY.md](./SECURITY.md) for the private reporting process.
+
+If you deploy your own instance, work through
+[docs/SECURITY_HARDENING.md](./docs/SECURITY_HARDENING.md) first. Hodari holds
+real user data and calls paid APIs.
+
+---
+
+## License
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](./LICENSE) and
+[NOTICE](./NOTICE).
+
+Hodari calls Google Maps Platform, Vertex AI, MongoDB Atlas, and Stripe. Each
+service has its own terms. This license grants you no right to use them. Bring
+your own keys and accept the terms of each provider.
+
+The name "Hodari" and the Hodari logo are not covered by the license. See
+Section 6 of the Apache License.
