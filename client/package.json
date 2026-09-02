@@ -13,7 +13,7 @@
     "@vis.gl/react-google-maps": "^1.4.0",
     "bootstrap": "^5.3.8",
     "clsx": "^2.1.1",
-    "framer-motion": "^12.40.0",
+    "framer-motion": "^13.1.1",
     "lucide-react": "^1.17.0",
     "next": "^15.0.0",
     "react": "^18.3.0",
