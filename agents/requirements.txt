@@ -2,7 +2,7 @@
 #
 # The mcp upper bound is load-bearing: mcp 2.x moved `mcp.shared.session`, and
 # google-adk imports it. Without the bound a fresh install fails to import.
-google-adk>=0.5.0,<3.0.0
+google-adk>=2.8.0,<3.0.0
 mcp>=1.0.0,<2.0.0
 python-dotenv>=1.0.0
 pydantic>=2.0.0
